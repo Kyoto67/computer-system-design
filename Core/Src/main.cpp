@@ -56,88 +56,126 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 //extern void initialise_monitor_handles(void);
-typedef enum {
-    SHORT_SIGNAL, LONG_SIGNAL, TIMEOUT, DREBEZG
-} SignalType;
+enum SignalType {
+    SHORT_SIGNAL, LONG_SIGNAL, TIMEOUT, BOUNCE
+};
 
-typedef enum {
+enum LockResponse {
     CORRECT, WRONG, OPEN, BLOCKED
-} LockResponse;
+};
 
-class Signal {
+enum TimeoutResult {
+    OK,
+    EXPIRED
+};
+
+class Timer {
 public:
-    Signal(uint32_t minLongSignalLength) :
-            startTime(0), endTime(0), minLongSignalLength(minLongSignalLength), maxDrebezgLength(10) {
-    }
-
     void begin() {
         startTime = HAL_GetTick();
     }
 
-    SignalType end() {
+    void end() {
         endTime = HAL_GetTick();
-        uint32_t duration = endTime - startTime;
+    }
 
-        if (duration > minLongSignalLength) {
-            return LONG_SIGNAL;
-        } else {
-            if (duration > maxDrebezgLength) {
-                return SHORT_SIGNAL;
-            } else {
-                return DREBEZG;
-            }
-        }
+    uint32_t duration() const {
+        return endTime - startTime;
     }
 
 private:
-    uint32_t startTime;
-    uint32_t endTime;
-    uint32_t minLongSignalLength;
-    uint32_t maxDrebezgLength;
+    uint32_t startTime = 0;
+    uint32_t endTime = 0;   
+};
 
+class Timeout : private Timer {
+public:
+    Timeout(bool (*pred)(void), uint32_t time = UINT32_MAX) : predicate(pred), timeout(time) {
+    }
+
+    TimeoutResult wait() {
+        Timer::begin();
+        while(!predicate()) {
+            Timer::end();
+            if (Timer::duration() > timeout) {
+                return EXPIRED;
+            }
+        }
+        return OK;
+    }
+
+private:
+    bool (*predicate)(void);
+    uint32_t timeout;
+};
+
+class Delay : private Timeout {
+public:
+    Delay(uint32_t time = UINT32_MAX) : Timeout(&falsePred, time) {
+    }
+
+    using Timeout::wait;
+
+private:
+    static bool falsePred() {
+        return false;
+    }
+};
+
+class Signal: private Timer {
+public:
+    Signal(uint32_t minLongSignalLength) :
+            minLongSignalLength(minLongSignalLength) {
+    }
+
+    using Timer::begin;
+
+    SignalType end() {
+        Timer::end();
+
+        if (Timer::duration() > minLongSignalLength) {
+            return LONG_SIGNAL;
+        } 
+        if (Timer::duration() > maxBounceLength) {
+            return SHORT_SIGNAL;
+        }
+
+        return BOUNCE;
+    }
+
+private:
+    uint32_t maxBounceLength = 10;
+    uint32_t minLongSignalLength;
 };
 
 class SignalListener {
 public:
-
     SignalType listen() {
         Signal signal(1500);
-        bool signalBeginsBeforeTimeout = waitForSignalBegin();
-        if (!signalBeginsBeforeTimeout) {
+
+        TimeoutResult signalBeginsBeforeTimeout = Timeout(&isButtonPressed, 30000).wait();
+
+        if (signalBeginsBeforeTimeout == EXPIRED) {
             return TIMEOUT;
         }
+
         signal.begin();
-        waitForSignalEnd();
+        Timeout(&isButtonReleased).wait();
         SignalType signalType = signal.end();
-        if (signalType == DREBEZG) {
+
+        if (signalType == BOUNCE) {
             return listen();
-        } else {
-            return signalType;
-        }
+        } 
+        return signalType;
     }
 
 private:
-    uint32_t timeout = 30000;
-
-    bool waitForSignalBegin() {
-        uint32_t idleBegin = HAL_GetTick();
-        while (!isButtonPressed()) {
-            uint32_t idleTime = HAL_GetTick() - idleBegin;
-            if (idleTime > timeout) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    void waitForSignalEnd() {
-        while (isButtonPressed()) {
-            //wait
-        }
-    }
-
-    bool isButtonPressed() {
+    static bool isButtonPressed() {
         return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
+    }
+
+    static bool isButtonReleased() {
+        return !isButtonPressed();
     }
 };
 
@@ -149,18 +187,16 @@ public:
             if (isOpen()) {
                 reset();
                 return OPEN;
-            } else {
-                return CORRECT;
             }
-        } else {
-            currentWrongAttempts++;
-            if (isBlocked()) {
-                reset();
-                return BLOCKED;
-            } else {
-                return WRONG;
-            }
-        }
+            return CORRECT;
+        } 
+        
+        currentWrongAttempts++;
+        if (isBlocked()) {
+            reset();
+            return BLOCKED;
+        } 
+        return WRONG;
     }
 
     void reset() {
@@ -193,28 +229,28 @@ class LampControl {
 public:
     void open() {
         HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
-        delay(10000);
+        Delay(10000).wait();
         HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
         isSessionStarted = false;
     }
 
     void correct() {
         HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
-        delay(500);
+        Delay(500).wait();
         HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
         isSessionStarted = true;
     }
 
     void wrong() {
         HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
-        delay(500);
+        Delay(500).wait();
         HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
     }
 
     void blocked() {
         for (int i = 0; i < 10; ++i) {
             wrong();
-            delay(500);
+            Delay(500).wait();
         }
         isSessionStarted = false;
     }
@@ -222,7 +258,7 @@ public:
     void reset() {
         if (isSessionStarted) {
             HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
-            delay(5000);
+            Delay(5000).wait();
             HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
             isSessionStarted = false;
         }
@@ -230,12 +266,6 @@ public:
 
 private:
     bool isSessionStarted = false;
-
-    void delay(uint32_t duration) {
-        uint32_t begin = HAL_GetTick();
-        while ((HAL_GetTick() - begin) < duration) {
-        }
-    }
 };
 
 /* USER CODE END 0 */
