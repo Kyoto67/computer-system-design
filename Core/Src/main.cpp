@@ -56,176 +56,216 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 //extern void initialise_monitor_handles(void);
-typedef enum {
-	SHORT_SIGNAL, LONG_SIGNAL, TIMEOUT
-} SignalType;
+enum SignalType {
+    SHORT_SIGNAL, LONG_SIGNAL, TIMEOUT, BOUNCE
+};
 
-typedef enum {
-	CORRECT, WRONG, OPEN, BLOCKED
-} LockResponse;
+enum LockResponse {
+    CORRECT, WRONG, OPEN, BLOCKED
+};
 
-class Signal {
+enum TimeoutResult {
+    OK,
+    EXPIRED
+};
+
+class Timer {
 public:
-	Signal(uint32_t minLongSignalLength) :
-			startTime(0), endTime(0), minLongSignalLength(minLongSignalLength) {
-	}
+    void begin() {
+        startTime = HAL_GetTick();
+    }
 
-	void begin() {
-		startTime = HAL_GetTick();
-	}
+    void end() {
+        endTime = HAL_GetTick();
+    }
 
-	SignalType end() {
-		endTime = HAL_GetTick();
-		uint32_t duration = endTime - startTime;
-
-		if (duration > minLongSignalLength) {
-			return LONG_SIGNAL;
-		} else {
-			return SHORT_SIGNAL;
-		}
-	}
+    uint32_t duration() const {
+        return endTime - startTime;
+    }
 
 private:
-	uint32_t startTime;
-	uint32_t endTime;
-	uint32_t minLongSignalLength;
+    uint32_t startTime = 0;
+    uint32_t endTime = 0;   
+};
 
+class Timeout : private Timer {
+public:
+    Timeout(bool (*pred)(void), uint32_t time = UINT32_MAX) : predicate(pred), timeout(time) {
+    }
+
+    TimeoutResult wait() {
+        Timer::begin();
+        while(!predicate()) {
+            Timer::end();
+            if (Timer::duration() > timeout) {
+                return EXPIRED;
+            }
+        }
+        return OK;
+    }
+
+private:
+    bool (*predicate)(void);
+    uint32_t timeout;
+};
+
+class Delay : private Timeout {
+public:
+    Delay(uint32_t time = UINT32_MAX) : Timeout(&falsePred, time) {
+    }
+
+    using Timeout::wait;
+
+private:
+    static bool falsePred() {
+        return false;
+    }
+};
+
+class Signal: private Timer {
+public:
+    Signal(uint32_t minLongSignalLength) :
+            minLongSignalLength(minLongSignalLength) {
+    }
+
+    using Timer::begin;
+
+    SignalType end() {
+        Timer::end();
+
+        if (Timer::duration() > minLongSignalLength) {
+            return LONG_SIGNAL;
+        } 
+        if (Timer::duration() > maxBounceLength) {
+            return SHORT_SIGNAL;
+        }
+
+        return BOUNCE;
+    }
+
+private:
+    uint32_t maxBounceLength = 10;
+    uint32_t minLongSignalLength;
 };
 
 class SignalListener {
 public:
+    SignalType listen() {
+        Signal signal(1500);
 
-	SignalType listen() {
-		Signal signal(1500);
-		bool signalBeginsBeforeTimeout = waitForSignalBegin();
-		if (!signalBeginsBeforeTimeout) {
-			return TIMEOUT;
-		}
-		signal.begin();
-		waitForSignalEnd();
-		return signal.end();
-	}
+        TimeoutResult signalBeginsBeforeTimeout = Timeout(&isButtonPressed, 30000).wait();
+
+        if (signalBeginsBeforeTimeout == EXPIRED) {
+            return TIMEOUT;
+        }
+
+        signal.begin();
+        Timeout(&isButtonReleased).wait();
+        SignalType signalType = signal.end();
+
+        if (signalType == BOUNCE) {
+            return listen();
+        } 
+        return signalType;
+    }
 
 private:
-	uint32_t timeout = 30000;
+    static bool isButtonPressed() {
+        return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
+    }
 
-	bool waitForSignalBegin() {
-		uint32_t idleBegin = HAL_GetTick();
-		while (!isButtonPressed()) {
-			uint32_t idleTime = HAL_GetTick() - idleBegin;
-			if (idleTime > timeout) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	void waitForSignalEnd() {
-		while (isButtonPressed()) {
-			//wait
-		}
-	}
-
-	bool isButtonPressed() {
-		return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
-	}
+    static bool isButtonReleased() {
+        return !isButtonPressed();
+    }
 };
 
 class Lock {
 public:
-	LockResponse tryUnlock(SignalType signal) {
-		if (isCorrectInput(signal)) {
-			pinPosition++;
-			if (isOpen()) {
-				reset();
-				return OPEN;
-			} else {
-				return CORRECT;
-			}
-		} else {
-			currentWrongAttempts++;
-			if (isBlocked()) {
-				reset();
-				return BLOCKED;
-			} else {
-				return WRONG;
-			}
-		}
-	}
+    LockResponse tryUnlock(SignalType signal) {
+        if (isCorrectInput(signal)) {
+            pinPosition++;
+            if (isOpen()) {
+                reset();
+                return OPEN;
+            }
+            return CORRECT;
+        } 
+        
+        currentWrongAttempts++;
+        if (isBlocked()) {
+            reset();
+            return BLOCKED;
+        } 
+        return WRONG;
+    }
 
-	void reset() {
-		pinPosition = 0;
-		currentWrongAttempts = 0;
-	}
+    void reset() {
+        pinPosition = 0;
+        currentWrongAttempts = 0;
+    }
 
 private:
-	uint8_t pinPosition = 0;
-	SignalType code[8] = { SHORT_SIGNAL, LONG_SIGNAL, SHORT_SIGNAL, LONG_SIGNAL,
-			SHORT_SIGNAL, LONG_SIGNAL, SHORT_SIGNAL, LONG_SIGNAL };
-	uint8_t wrongAttemptsAvailable = 3;
-	uint8_t currentWrongAttempts = 0;
+    uint8_t pinPosition = 0;
+    SignalType code[8] = {SHORT_SIGNAL, LONG_SIGNAL, SHORT_SIGNAL, LONG_SIGNAL,
+                          SHORT_SIGNAL, LONG_SIGNAL, SHORT_SIGNAL, LONG_SIGNAL};
+    uint8_t wrongAttemptsAvailable = 3;
+    uint8_t currentWrongAttempts = 0;
 
-	bool isOpen() {
-		return pinPosition == 8;
-	}
+    bool isOpen() {
+        return pinPosition == 8;
+    }
 
-	bool isBlocked() {
-		return currentWrongAttempts == wrongAttemptsAvailable;
-	}
+    bool isBlocked() {
+        return currentWrongAttempts == wrongAttemptsAvailable;
+    }
 
-	bool isCorrectInput(SignalType signal) {
-		return code[pinPosition] == signal;
-	}
+    bool isCorrectInput(SignalType signal) {
+        return code[pinPosition] == signal;
+    }
 
 };
 
 class LampControl {
 public:
-	void open() {
-		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
-		delay(10000);
-		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
-		isSessionStarted = false;
-	}
+    void open() {
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+        Delay(10000).wait();
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+        isSessionStarted = false;
+    }
 
-	void correct() {
-		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
-		delay(500);
-		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
-		isSessionStarted = true;
-	}
+    void correct() {
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
+        Delay(500).wait();
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+        isSessionStarted = true;
+    }
 
-	void wrong() {
-		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
-		delay(500);
-		HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
-	}
+    void wrong() {
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_SET);
+        Delay(500).wait();
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_15, GPIO_PIN_RESET);
+    }
 
-	void blocked() {
-		for (int i = 0; i < 10; ++i) {
-			wrong();
-			delay(500);
-		}
-		isSessionStarted = false;
-	}
+    void blocked() {
+        for (int i = 0; i < 10; ++i) {
+            wrong();
+            Delay(500).wait();
+        }
+        isSessionStarted = false;
+    }
 
-	void reset() {
-		if (isSessionStarted) {
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
-			delay(5000);
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
-			isSessionStarted = false;
-		}
-	}
+    void reset() {
+        if (isSessionStarted) {
+            HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
+            Delay(5000).wait();
+            HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+            isSessionStarted = false;
+        }
+    }
 
 private:
-	bool isSessionStarted = false;
-
-	void delay(uint32_t duration) {
-		uint32_t begin = HAL_GetTick();
-		while ((HAL_GetTick() - begin) < duration) {
-		}
-	}
+    bool isSessionStarted = false;
 };
 
 /* USER CODE END 0 */
@@ -235,65 +275,65 @@ private:
  * @retval int
  */
 int main(void) {
-	/* USER CODE BEGIN 1 */
+    /* USER CODE BEGIN 1 */
 //	initialise_monitor_handles();
-	SignalListener signalListener;
-	Lock lock;
-	LampControl lampControl;
+    SignalListener signalListener;
+    Lock lock;
+    LampControl lampControl;
 
-	/* USER CODE END 1 */
+    /* USER CODE END 1 */
 
-	/* MCU Configuration--------------------------------------------------------*/
+    /* MCU Configuration--------------------------------------------------------*/
 
-	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-	HAL_Init();
+    /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+    HAL_Init();
 
-	/* USER CODE BEGIN Init */
+    /* USER CODE BEGIN Init */
 
-	/* USER CODE END Init */
+    /* USER CODE END Init */
 
-	/* Configure the system clock */
-	SystemClock_Config();
+    /* Configure the system clock */
+    SystemClock_Config();
 
-	/* USER CODE BEGIN SysInit */
+    /* USER CODE BEGIN SysInit */
 
-	/* USER CODE END SysInit */
+    /* USER CODE END SysInit */
 
-	/* Initialize all configured peripherals */
-	MX_GPIO_Init();
-	/* USER CODE BEGIN 2 */
+    /* Initialize all configured peripherals */
+    MX_GPIO_Init();
+    /* USER CODE BEGIN 2 */
 
-	/* USER CODE END 2 */
+    /* USER CODE END 2 */
 
-	/* Infinite loop */
-	/* USER CODE BEGIN WHILE */
-	while (1) {
+    /* Infinite loop */
+    /* USER CODE BEGIN WHILE */
+    while (1) {
 //		printf("Hello world!\n");
-		SignalType signal = signalListener.listen();
-		if (signal == TIMEOUT) {
-			lock.reset();
-			lampControl.reset();
-		} else {
-			switch (lock.tryUnlock(signal)) {
-			case CORRECT:
-				lampControl.correct();
-				break;
-			case WRONG:
-				lampControl.wrong();
-				break;
-			case OPEN:
-				lampControl.open();
-				break;
-			case BLOCKED:
-				lampControl.blocked();
-				break;
-			}
-		}
-		/* USER CODE END WHILE */
+        SignalType signal = signalListener.listen();
+        if (signal == TIMEOUT) {
+            lock.reset();
+            lampControl.reset();
+        } else {
+            switch (lock.tryUnlock(signal)) {
+                case CORRECT:
+                    lampControl.correct();
+                    break;
+                case WRONG:
+                    lampControl.wrong();
+                    break;
+                case OPEN:
+                    lampControl.open();
+                    break;
+                case BLOCKED:
+                    lampControl.blocked();
+                    break;
+            }
+        }
+        /* USER CODE END WHILE */
 
-		/* USER CODE BEGIN 3 */
-	}
-	/* USER CODE END 3 */
+        /* USER CODE BEGIN 3 */
+    }
+    /* USER CODE END 3 */
 }
 
 /**
@@ -301,37 +341,37 @@ int main(void) {
  * @retval None
  */
 void SystemClock_Config(void) {
-	RCC_OscInitTypeDef RCC_OscInitStruct = { 0 };
-	RCC_ClkInitTypeDef RCC_ClkInitStruct = { 0 };
+    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-	/** Configure the main internal regulator output voltage
-	 */
-	__HAL_RCC_PWR_CLK_ENABLE();
-	__HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
+    /** Configure the main internal regulator output voltage
+     */
+    __HAL_RCC_PWR_CLK_ENABLE();
+    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE3);
 
-	/** Initializes the RCC Oscillators according to the specified parameters
-	 * in the RCC_OscInitTypeDef structure.
-	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
-	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-	RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
-	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
-		Error_Handler();
-	}
+    /** Initializes the RCC Oscillators according to the specified parameters
+     * in the RCC_OscInitTypeDef structure.
+     */
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+    RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+        Error_Handler();
+    }
 
-	/** Initializes the CPU, AHB and APB buses clocks
-	 */
-	RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-			| RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
-	RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
-	RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-	RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-	RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+    /** Initializes the CPU, AHB and APB buses clocks
+     */
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
+                                  | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-	if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) {
-		Error_Handler();
-	}
+    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK) {
+        Error_Handler();
+    }
 }
 
 /* USER CODE BEGIN 4 */
@@ -343,12 +383,12 @@ void SystemClock_Config(void) {
  * @retval None
  */
 void Error_Handler(void) {
-	/* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
-	__disable_irq();
-	while (1) {
-	}
-	/* USER CODE END Error_Handler_Debug */
+    /* USER CODE BEGIN Error_Handler_Debug */
+    /* User can add his own implementation to report the HAL error return state */
+    __disable_irq();
+    while (1) {
+    }
+    /* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
