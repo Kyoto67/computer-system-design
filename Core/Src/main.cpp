@@ -213,26 +213,73 @@ private:
 	bool isSessionStarted = false;
 };
 
+
+class RingBuffer {
+    static const int MAX_CAPACITY = 256;
+
+
+    char* push(bool* result) {
+        if(isFull()) {
+            *result = false;
+            return nullptr;
+        }
+        *result = true;
+        return &buffer[tail++];
+    }
+
+    char* pop(bool* result) {
+        if(isEmpty()) {
+            *result = false;
+            return nullptr;
+        }
+
+        *result = true;
+        return &buffer[head++];
+    }
+
+    bool isEmpty() const {
+        return head == tail;
+    }
+
+    bool isFull() const {
+        return tail + 1 = head;
+    }
+
+private:
+    uint8_t head = 0, tail = 0;
+    char buffer[MAX_CAPACITY];
+};
+
+
 class Input {
 public:
 	bool readChar() {
-		return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t*) &buffer, 1, 1);
+        bool result = true;
+        return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t*) buffer.push(&result), 1, 1) && result;
 	}
 
-	char getChar() const {
-		return buffer;
+	char getChar() {
+        char ret;
+        while(!buffer.pop(&ret)) {
+        }
+		return ret;
 	}
 
 private:
-	char buffer;
+	RingBuffer buffer;
 };
 
 class Output {
 public:
-	void printChar(char *c) {
-		HAL_UART_Transmit(&huart6, (uint8_t*) c, 1, 10);
+	bool printChar(char c) {
+        bool result = true;
+        *buffer.push(result) = c;
+        return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t*) buffer.pop(&result), 1, 10) && result;
 	}
 
+
+private:
+    RingBuffer buffer;
 };
 
 class Session {
@@ -310,7 +357,7 @@ int main(void) {
 	while (1) {
 		if (input.readChar()) {
 			char c = input.getChar();
-			output.printChar(&c);
+			output.printChar(c);
 			session.ensureForSessionStarted();
 			switch (lock.tryUnlock(c)) {
 			case CORRECT:
