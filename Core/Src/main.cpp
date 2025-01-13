@@ -381,28 +381,82 @@ private:
 class Interactives {
 public:
     bool askNewCode(char toFill[], uint8_t len, Session currentSession) {
-        //print input invite
+        char inputInvite[] = "\nPlease, input the new passcode: ";
+        char tmp[len];
+        for (char c: inputInvite) {
+            DRIVER.send(c);
+        }
         for (int i = 0; i < len; ++i) {
             char c;
-            if (DRIVER.recv(&c)) {
-                currentSession.recordActivity();
-                if (c == 10) {
-                    while (i < len) {
-                        toFill[i] = 0;
-                        i++;
-                    }
-                } else {
-                    toFill[i] = c;
-                }
-            } else {
+            while (DRIVER.recv(&c)) {
                 if (currentSession.isSessionTimeouted()) {
                     currentSession.abortSession();
                     return false;
                 }
             }
+            currentSession.recordActivity();
+            if (c == 10) {
+                while (i < len) {
+                    tmp[i] = 0;
+                    i++;
+                }
+            } else {
+                tmp[i] = c;
+            }
         }
-        //accept changes? return result
-        return true;
+        char repeatNewPasscodeMessage[] = "\nThe new passcode will be: ";
+        for (char c: repeatNewPasscodeMessage) {
+            DRIVER.send(c);
+        }
+        for (char c: tmp) {
+            DRIVER.send(c);
+        }
+        char confirmingMessage[] = "\nConfirm? (y/n): ";
+        for (char c: confirmingMessage) {
+            DRIVER.send(c);
+        }
+        char c;
+        while (DRIVER.recv(&c));
+        if (c == 'y') {
+            for (int i = 0; i < len; i++) {
+                toFill[i] = tmp[i];
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+};
+
+class ToggleDriver {
+public:
+    bool isToggleActivated() {
+        if (isButtonPressed()) {
+            if (!buttonWasPressed) {
+                buttonPressedFrom = HAL_GetTick();
+            }
+            buttonWasPressed = true;
+        } else {
+            if (buttonWasPressed) {
+                buttonWasPressed = false;
+                uint32_t currTime = HAL_GetTick();
+                uint32_t buttonPressDuration = currTime - buttonPressedFrom;
+                if (buttonPressDuration > bounceLengthBorder) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+private:
+    bool buttonWasPressed = false;
+    uint32_t buttonPressedFrom = 0;
+    const uint32_t bounceLengthBorder = 10;
+
+    bool isButtonPressed() {
+        return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
     }
 };
 
@@ -439,35 +493,18 @@ public:
                 return UserCommandDto(TRY_UNLOCK, c);
             }
         } else {
-            if (isButtonPressed()) {
-                if (!buttonWasPressed) {
-                	buttonPressedFrom = HAL_GetTick();
-                }
-                buttonWasPressed = true;
-            } else {
-                if (buttonWasPressed) {
-                	uint32_t currTime = HAL_GetTick();
-                	uint32_t buttonPressDuration = currTime - buttonPressedFrom;
-                    if (buttonPressDuration > bounceLengthBorder) {
-                    	buttonWasPressed = false;
-                        return UserCommandDto(TOGGLE_IT_MODE, c);
-                    }
-                }
-                buttonWasPressed = false;
+            if (toggleDriver.isToggleActivated()) {
+                return UserCommandDto(TOGGLE_IT_MODE, c);
             }
-            return UserCommandDto(NOTHING, c);
         }
+        return UserCommandDto(NOTHING, c);
     }
 
-    bool isButtonPressed() {
-        return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
-    }
 
 private:
-    bool buttonWasPressed = false;
-    uint32_t buttonPressedFrom = 0;
-    const uint32_t bounceLengthBorder = 10;
+    ToggleDriver toggleDriver;
 };
+
 /* USER CODE END 0 */
 
 /**
@@ -514,7 +551,6 @@ int main(void) {
         UserCommandDto command = userListener.listenCommand();
         switch (command.getUserInstruction()) {
             case SET_PASSCODE:
-                session.recordActivity();
                 char newCode[9];
                 if (interactives.askNewCode(newCode, lock.getCodeLen(), session)) {
                     lock.setCode(newCode);
