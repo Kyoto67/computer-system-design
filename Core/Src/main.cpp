@@ -150,6 +150,10 @@ public:
         resetCurrentWrongAttempts();
     }
 
+    uint8_t getCodeLen() {
+        return sizeof(code) / sizeof(char) - 1;
+    }
+
 private:
     uint8_t pinPosition = 0;
     char code[9] = {'z', 'z', 'z', 'z', 'z', 'z', 'z', 'z', 0};
@@ -231,6 +235,7 @@ public:
     ~InterruptGuard() {
         __set_PRIMASK(pmask);
     }
+
 private:
     uint32_t pmask;
 };
@@ -239,11 +244,11 @@ class RingBuffer {
 public:
     static const int MAX_CAPACITY = 256;
 
-    char* tail() {
+    char *tail() {
         return &_buffer[_tail];
     }
 
-    char* head() {
+    char *head() {
         return &_buffer[_head];
     }
 
@@ -287,34 +292,40 @@ public:
     };
 
 
-    bool recv(char* c) {
+    bool recv(char *c) {
         switch (current) {
-        case INT: {
-            char* head = input.head();
-            if(!input.pop()) {
-                HAL_UART_Receive_IT(&huart6, (uint8_t *) input.tail(), 1);
-                return false;
+            case INT: {
+                char *head = input.head();
+                if (!input.pop()) {
+                    HAL_UART_Receive_IT(&huart6, (uint8_t *) input.tail(), 1);
+                    return false;
+                }
+                *c = *head;
+                return true;
             }
-            *c = *head;
-            return true;
-        }break;
-        case BLOCK: return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 1);
-        default: return false;
+                break;
+            case BLOCK:
+                return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 1);
+            default:
+                return false;
         }
     }
 
     bool send(char c) {
         switch (current) {
-        case INT: {
-            if(output.push()) {
-                *output.tail() = c;
-                HAL_UART_Transmit_IT(&huart6, (uint8_t *) output.tail(), 1);
-                return true;
+            case INT: {
+                if (output.push()) {
+                    *output.tail() = c;
+                    HAL_UART_Transmit_IT(&huart6, (uint8_t *) output.tail(), 1);
+                    return true;
+                }
+                return false;
             }
-            return false;
-        } break;
-        case BLOCK: return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 10);
-        default: return false;
+                break;
+            case BLOCK:
+                return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 10);
+            default:
+                return false;
         }
     }
 
@@ -323,12 +334,12 @@ public:
     Mode current = BLOCK;
 } DRIVER;
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef * huart) {
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     DRIVER.input.push();
     HAL_UART_Receive_IT(&huart6, (uint8_t *) DRIVER.input.tail(), 1);
 }
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef * huart) {
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     DRIVER.output.pop();
 }
 
@@ -388,6 +399,34 @@ public:
         return true;
     }
 };
+
+enum Command {
+    SET_PASSCODE, TRY_UNLOCK, NOTHING
+};
+
+class UserListener {
+public:
+    Command listenCommand() {
+        char c;
+        if (DRIVER.recv(&c)) {
+            DRIVER.send(c);
+            if (c == '+') {
+                return SET_PASSCODE;
+            } else {
+                return TRY_UNLOCK;
+            }
+        } else {
+            return NOTHING;
+        }
+    }
+
+    char getInput() {
+        return input;
+    }
+
+private:
+    char input;
+};
 /* USER CODE END 0 */
 
 /**
@@ -401,6 +440,7 @@ int main(void) {
     LampControl lampControl;
     Session session;
     Interactives interactives;
+    UserListener userListener;
 
     /* USER CODE END 1 */
 
@@ -430,19 +470,20 @@ int main(void) {
     /* USER CODE BEGIN WHILE */
     DRIVER.current = UartDriver::Mode::INT;
     while (1) {
-        char c;
-        if (DRIVER.recv(&c)) {
-            if (c == '+') {
+        Command command = userListener.listenCommand();
+        switch (command) {
+            case SET_PASSCODE:
+                session.recordActivity();
                 char newCode[9];
-                if (interactives.askNewCode(newCode, 9, session)) {
+                if (interactives.askNewCode(newCode, lock.getCodeLen(), session)) {
                     lock.setCode(newCode);
                 }
                 session.abortSession();
                 lampControl.reset();
-            } else {
-                DRIVER.send(c);
+                break;
+            case TRY_UNLOCK:
                 session.recordActivity();
-                switch (lock.tryUnlock(c)) {
+                switch (lock.tryUnlock(userListener.getInput())) {
                     case CORRECT:
                         lampControl.correct();
                         break;
@@ -456,19 +497,21 @@ int main(void) {
                         lampControl.blocked();
                         break;
                 }
-            }
-        } else {
-            if (session.isSessionTimeouted()) {
-                session.abortSession();
-                lock.reset();
-                lampControl.reset();
-            }
+                break;
+            case NOTHING:
+                if (session.isSessionTimeouted()) {
+                    session.abortSession();
+                    lock.reset();
+                    lampControl.reset();
+                }
+                break;
+
         }
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
     }
-    /* USER CODE END 3 */
+/* USER CODE END 3 */
 }
 
 /**
