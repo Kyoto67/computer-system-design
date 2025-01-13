@@ -1,28 +1,30 @@
-../Core/Src/main.cpp:69:10:void Timer::begin()	16	static
-../Core/Src/main.cpp:73:10:void Timer::end()	16	static
-../Core/Src/main.cpp:77:14:uint32_t Timer::duration() const	16	static
-../Core/Src/main.cpp:67:7:constexpr Timer::Timer()	16	static
-../Core/Src/main.cpp:88:5:Timeout::Timeout(bool (*)(), uint32_t)	24	static
-../Core/Src/main.cpp:91:19:TimeoutResult Timeout::wait()	16	static
-../Core/Src/main.cpp:110:5:Delay::Delay(uint32_t)	16	static
-../Core/Src/main.cpp:116:17:static bool Delay::falsePred()	4	static
-../Core/Src/main.cpp:124:18:LockResponse Lock::tryUnlock(char)	16	static
-../Core/Src/main.cpp:143:10:void Lock::reset()	16	static
-../Core/Src/main.cpp:154:10:bool Lock::isOpen()	16	static
-../Core/Src/main.cpp:158:10:bool Lock::isBlocked()	16	static
-../Core/Src/main.cpp:162:10:bool Lock::isCorrectInput(char)	24	static
-../Core/Src/main.cpp:170:10:void LampControl::open()	32	static
-../Core/Src/main.cpp:177:10:void LampControl::correct()	32	static
-../Core/Src/main.cpp:184:10:void LampControl::wrong()	32	static
-../Core/Src/main.cpp:190:10:void LampControl::blocked()	40	static
-../Core/Src/main.cpp:198:10:void LampControl::reset()	32	static
-../Core/Src/main.cpp:213:10:bool Input::readChar()	16	static
-../Core/Src/main.cpp:217:10:char Input::getChar() const	16	static
-../Core/Src/main.cpp:227:10:void Output::printChar(char*)	16	static
-../Core/Src/main.cpp:235:10:void Session::ensureForSessionStarted()	16	static
-../Core/Src/main.cpp:242:14:uint32_t Session::getSessionDuration()	16	static
-../Core/Src/main.cpp:250:10:bool Session::isSessionTimeouted()	16	static
-../Core/Src/main.cpp:254:10:void Session::abortSession()	16	static
-../Core/Src/main.cpp:272:5:int main()	72	static
-../Core/Src/main.cpp:346:6:void SystemClock_Config()	88	static
-../Core/Src/main.cpp:387:6:void Error_Handler()	4	static,ignoring_inline_asm
+../Core/Src/main.cpp:65:7:void Timer::begin()	16	static
+../Core/Src/main.cpp:69:7:void Timer::end()	16	static
+../Core/Src/main.cpp:73:11:uint32_t Timer::duration() const	16	static
+../Core/Src/main.cpp:63:7:constexpr Timer::Timer()	16	static
+../Core/Src/main.cpp:84:2:Timeout::Timeout(bool (*)(), uint32_t)	24	static
+../Core/Src/main.cpp:88:16:TimeoutResult Timeout::wait()	16	static
+../Core/Src/main.cpp:107:2:Delay::Delay(uint32_t)	16	static
+../Core/Src/main.cpp:114:14:static bool Delay::falsePred()	4	static
+../Core/Src/main.cpp:121:15:LockResponse Lock::tryUnlock(char)	16	static
+../Core/Src/main.cpp:140:7:void Lock::reset()	16	static
+../Core/Src/main.cpp:151:7:bool Lock::isOpen()	16	static
+../Core/Src/main.cpp:155:7:bool Lock::isBlocked()	16	static
+../Core/Src/main.cpp:159:7:bool Lock::isCorrectInput(char)	24	static
+../Core/Src/main.cpp:163:7:void Lock::resetPinPosition()	16	static
+../Core/Src/main.cpp:167:7:void Lock::resetCurrentWrongAttempts()	16	static
+../Core/Src/main.cpp:175:7:void LampControl::open()	32	static
+../Core/Src/main.cpp:182:7:void LampControl::correct()	32	static
+../Core/Src/main.cpp:189:7:void LampControl::wrong()	32	static
+../Core/Src/main.cpp:195:7:void LampControl::blocked()	40	static
+../Core/Src/main.cpp:203:7:void LampControl::reset()	32	static
+../Core/Src/main.cpp:218:7:bool Input::readChar()	16	static
+../Core/Src/main.cpp:222:7:char Input::getChar() const	16	static
+../Core/Src/main.cpp:232:7:void Output::printChar(char*)	16	static
+../Core/Src/main.cpp:240:7:void Session::ensureForSessionStarted()	16	static
+../Core/Src/main.cpp:247:11:uint32_t Session::getSessionDuration()	16	static
+../Core/Src/main.cpp:255:7:bool Session::isSessionTimeouted()	16	static
+../Core/Src/main.cpp:259:7:void Session::abortSession()	16	static
+../Core/Src/main.cpp:275:5:int main()	48	static
+../Core/Src/main.cpp:347:6:void SystemClock_Config()	88	static
+../Core/Src/main.cpp:388:6:void Error_Handler()	4	static,ignoring_inline_asm
