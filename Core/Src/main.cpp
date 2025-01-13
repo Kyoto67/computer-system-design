@@ -400,32 +400,42 @@ public:
     }
 };
 
-enum Command {
+enum UserInstruction {
     SET_PASSCODE, TRY_UNLOCK, NOTHING
+};
+
+class UserCommandDto {
+public:
+    UserCommandDto(UserInstruction instruction, char input) : instruction(instruction), input(input) {}
+
+    char getUserInput() {
+        return input;
+    }
+
+    UserInstruction getUserInstruction() {
+        return instruction;
+    }
+
+private:
+    UserInstruction instruction;
+    char input;
 };
 
 class UserListener {
 public:
-    Command listenCommand() {
+    static UserCommandDto listenCommand() {
         char c;
         if (DRIVER.recv(&c)) {
             DRIVER.send(c);
             if (c == '+') {
-                return SET_PASSCODE;
+                return UserCommandDto(SET_PASSCODE, c);
             } else {
-                return TRY_UNLOCK;
+                return UserCommandDto(TRY_UNLOCK, c);
             }
         } else {
-            return NOTHING;
+            return UserCommandDto(NOTHING, c);
         }
     }
-
-    char getInput() {
-        return input;
-    }
-
-private:
-    char input;
 };
 /* USER CODE END 0 */
 
@@ -440,7 +450,6 @@ int main(void) {
     LampControl lampControl;
     Session session;
     Interactives interactives;
-    UserListener userListener;
 
     /* USER CODE END 1 */
 
@@ -470,8 +479,8 @@ int main(void) {
     /* USER CODE BEGIN WHILE */
     DRIVER.current = UartDriver::Mode::INT;
     while (1) {
-        Command command = userListener.listenCommand();
-        switch (command) {
+        UserCommandDto command = UserListener::listenCommand();
+        switch (command.getUserInstruction()) {
             case SET_PASSCODE:
                 session.recordActivity();
                 char newCode[9];
@@ -483,7 +492,7 @@ int main(void) {
                 break;
             case TRY_UNLOCK:
                 session.recordActivity();
-                switch (lock.tryUnlock(userListener.getInput())) {
+                switch (lock.tryUnlock(command.getUserInput())) {
                     case CORRECT:
                         lampControl.correct();
                         break;
@@ -505,7 +514,6 @@ int main(void) {
                     lampControl.reset();
                 }
                 break;
-
         }
         /* USER CODE END WHILE */
 
