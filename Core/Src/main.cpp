@@ -368,9 +368,9 @@ public:
     bool askNewCode(char toFill[], uint8_t len, Session currentSession) {
         //print input invite
         for (int i = 0; i < len; ++i) {
-            if (input.readChar()) {
+            char c;
+            if (DRIVER.recv(&c)) {
                 currentSession.recordActivity();
-                char c = input.getChar();
                 if (c == 10) {
                     while (i < len) {
                         toFill[i] = 0;
@@ -389,9 +389,6 @@ public:
         //accept changes? return result
         return true;
     }
-
-private:
-    Input input;
 };
 /* USER CODE END 0 */
 
@@ -404,8 +401,6 @@ int main(void) {
 // initialise_monitor_handles();
     Lock lock;
     LampControl lampControl;
-    Input input;
-    Output output;
     Session session;
     Interactives interactives;
 
@@ -436,8 +431,9 @@ int main(void) {
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1) {
-        if (input.readChar()) {
-            char c = input.getChar();
+        char c;
+        if (DRIVER.recv(&c)) {
+            DRIVER.send(c);
             if (c == '+') {
                 char newCode[9];
                 if (interactives.askNewCode(newCode, 9, session)) {
