@@ -410,7 +410,7 @@ int main(void) {
                 session.abortSession();
                 lampControl.reset();
             } else {
-                output.printChar(&c);
+                output.printChar(c);
                 session.recordActivity();
                 switch (lock.tryUnlock(c)) {
                     case CORRECT:
