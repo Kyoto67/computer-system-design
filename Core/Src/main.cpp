@@ -546,7 +546,7 @@ int main(void) {
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-    DRIVER.is_blocking = true;
+    DRIVER.current = UartDriver::Mode::BLOCK;
     while (1) {
         UserCommandDto command = userListener.listenCommand();
         switch (command.getUserInstruction()) {
@@ -577,7 +577,7 @@ int main(void) {
                 break;
             case TOGGLE_IT_MODE:
                 session.recordActivity();
-                DRIVER.is_blocking = !DRIVER.is_blocking;
+                DRIVER.switchMode();
                 break;
             case NOTHING:
                 if (session.isSessionTimeouted()) {
