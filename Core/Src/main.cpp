@@ -23,6 +23,7 @@
 #include "usart.h"
 #include <cstdint>
 #include <cctype>
+#include <utility>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -250,7 +251,7 @@ public:
             return nullptr;
         }
         _buffer[_tail] = value;
-        return _buffer[_tail++];
+        return &_buffer[_tail++];
     }
 
     char* pop(char* value) {
@@ -259,7 +260,7 @@ public:
             return nullptr;
         }
         *value = _buffer[_head]; 
-        return _buffer[_head++];
+        return &_buffer[_head++];
     }
 
 
@@ -280,32 +281,22 @@ private:
 
 class UartDriver {
 public:
-    enum Mode {
-        INT,
-        BLOCK
-    };
 
     bool recv(char* c) {
-        switch (current) {
-        case INT: {
-            init_recv();
-            return input.pop(c) != nullptr;
-        }break;
-        case BLOCK: return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 1);
-        default: return false;
-        }
+    	if(is_blocking) {
+    		return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 1);
+    	}
+    	init_recv();
+    	return input.pop(c) != nullptr;
     }
 
-    void send(char c) {
-        switch (current) {
-        case INT: {
-            char* prev = output.push(c);
-            init_send();
-            return prev != nullptr;
-        } break;
-        case BLOCK: return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 10);
-        default: return false;
-        }
+    bool send(char c) {
+    	if(is_blocking) {
+    		return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 10);
+    	}
+    	char* prev = output.push(c);
+		init_send();
+		return prev != nullptr;
     }
 
     void init_recv() {
@@ -313,6 +304,7 @@ public:
             char* tail = input.push('0');
             char stub;
             char* head = input.pop(&stub);
+            (void)head;
             // assert(head == tail);
             HAL_UART_Receive_IT(&huart6, (uint8_t *) tail, 1);
         }
@@ -321,7 +313,7 @@ public:
     void init_send() {
         if(!std::exchange(start_send, true)) {
             char stub;
-            char* head = DRIVER.output.pop(&stub);
+            char* head = output.pop(&stub);
             if(head != nullptr) {
                 HAL_UART_Transmit_IT(&huart6, (uint8_t *) head, 1);
             }
@@ -331,7 +323,7 @@ public:
     RingBuffer input;
     RingBuffer output;
     bool start_recv = false, start_send = false;
-    Mode current = BLOCK;
+    bool is_blocking = true;
 } DRIVER;
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef * huart) {
@@ -509,7 +501,7 @@ int main(void) {
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
-    DRIVER.current = UartDriver::Mode::INT;
+    DRIVER.is_blocking = true;
     while (1) {
         UserCommandDto command = userListener.listenCommand();
         switch (command.getUserInstruction()) {
@@ -541,7 +533,7 @@ int main(void) {
                 break;
             case TOGGLE_IT_MODE:
                 session.recordActivity();
-                DRIVER.current = UartDriver::Mode::BLOCK;
+                DRIVER.is_blocking = !DRIVER.is_blocking;
                 break;
             case NOTHING:
                 if (session.isSessionTimeouted()) {
