@@ -401,7 +401,7 @@ public:
 };
 
 enum UserInstruction {
-    SET_PASSCODE, TRY_UNLOCK, NOTHING
+    SET_PASSCODE, TRY_UNLOCK, TOGGLE_IT_MODE, NOTHING
 };
 
 class UserCommandDto {
@@ -433,9 +433,32 @@ public:
                 return UserCommandDto(TRY_UNLOCK, c);
             }
         } else {
+            if (isButtonPressed()) {
+                buttonWasPressed = true;
+                buttonPressedFrom = HAL_GetTick();
+            } else {
+                if (buttonWasPressed) {
+                    uint32_t buttonPressDuration = HAL_GetTick() - buttonPressedFrom;
+                    if (buttonPressDuration > bounceLengthBorder) {
+                        return UserCommandDto(TOGGLE_IT_MODE, c);
+                    }
+                }
+                buttonWasPressed = false;
+            }
             return UserCommandDto(NOTHING, c);
         }
     }
+
+    static bool isButtonPressed() {
+        return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
+    }
+
+private:
+    static bool buttonWasPressed;
+    static uint32_t buttonPressedFrom;
+    const static uint32_t bounceLengthBorder = 10;
+
+
 };
 /* USER CODE END 0 */
 
@@ -506,6 +529,10 @@ int main(void) {
                         lampControl.blocked();
                         break;
                 }
+                break;
+            case TOGGLE_IT_MODE:
+                session.recordActivity();
+                DRIVER.current = UartDriver::Mode::BLOCK;
                 break;
             case NOTHING:
                 if (session.isSessionTimeouted()) {
