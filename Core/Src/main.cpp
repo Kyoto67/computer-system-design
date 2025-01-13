@@ -255,10 +255,6 @@ public:
         return _tail + 1 == _head;
     }
 
-    bool pop() {
-        return &_buffer[_head];
-    }
-
     bool push() {
         if (isFull()) {
             return false;
@@ -296,13 +292,14 @@ public:
         case INT: {
             char* head = input.head();
             if(!input.pop()) {
-                HAL_UART_Receive_IT(&huart6, (uint8_t *) &input.tail(), 1, 1);
+                HAL_UART_Receive_IT(&huart6, (uint8_t *) input.tail(), 1);
                 return false;
             }
             *c = *head;
             return true;
         }break;
-        case BLOCK: return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) &c, 1, 1);
+        case BLOCK: return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 1);
+        default: return false;
         }
     }
 
@@ -311,12 +308,13 @@ public:
         case INT: {
             if(output.push()) {
                 *output.tail() = c;
-                HAL_UART_Receive_IT(&huart6, (uint8_t *) &output.tail(), 1, 1);
+                HAL_UART_Transmit_IT(&huart6, (uint8_t *) output.tail(), 1);
                 return true;
             }
             return false;
         } break;
         case BLOCK: return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 10);
+        default: return false;
         }
     }
 
@@ -325,12 +323,12 @@ public:
     Mode current = BLOCK;
 } DRIVER;
 
-void HAL_UART_RxCpltCallback(HAL_HandleTypeDef * huart) {
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef * huart) {
     DRIVER.input.push();
-    HAL_UART_Receive_IT(&huart6, (uint8_t *) &driver.input.tail(), 1, 1);
+    HAL_UART_Receive_IT(&huart6, (uint8_t *) DRIVER.input.tail(), 1);
 }
 
-void HAL_UART_TxCpltCallback(HAL_HandleTypeDef * huart) {
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef * huart) {
     DRIVER.output.pop();
 }
 
@@ -430,6 +428,7 @@ int main(void) {
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
+    DRIVER.current = UartDriver::Mode::INT;
     while (1) {
         char c;
         if (DRIVER.recv(&c)) {

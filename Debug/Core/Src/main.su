@@ -19,24 +19,25 @@
 ../Core/Src/main.cpp:197:10:void LampControl::wrong()	32	static
 ../Core/Src/main.cpp:203:10:void LampControl::blocked()	40	static
 ../Core/Src/main.cpp:211:10:void LampControl::reset()	32	static
-../Core/Src/main.cpp:227:5:InterruptGuard::InterruptGuard()	24	static,ignoring_inline_asm
-../Core/Src/main.cpp:231:5:InterruptGuard::~InterruptGuard()	24	static,ignoring_inline_asm
-../Core/Src/main.cpp:242:11:char* RingBuffer::push(bool*)	32	static
-../Core/Src/main.cpp:252:11:char* RingBuffer::pop(bool*)	32	static
-../Core/Src/main.cpp:264:10:bool RingBuffer::isEmpty() const	16	static
-../Core/Src/main.cpp:268:10:bool RingBuffer::isFull() const	16	static
-../Core/Src/main.cpp:293:10:bool Input::readChar()	24	static
-../Core/Src/main.cpp:303:10:char Input::getChar()	24	static
-../Core/Src/main.cpp:318:10:bool Output::printChar(char)	24	static
-../Core/Src/main.cpp:331:10:void Session::recordActivity()	16	static
-../Core/Src/main.cpp:336:14:uint32_t Session::getDurationFromLastSessionActivity()	16	static
-../Core/Src/main.cpp:344:10:bool Session::isSessionTimeouted()	16	static
-../Core/Src/main.cpp:348:10:void Session::abortSession()	16	static
-../Core/Src/main.cpp:360:10:bool Interactives::askNewCode(char*, uint8_t, Session)	32	static
+../Core/Src/main.cpp:242:11:char* RingBuffer::tail()	16	static
+../Core/Src/main.cpp:246:11:char* RingBuffer::head()	16	static
+../Core/Src/main.cpp:250:10:bool RingBuffer::isEmpty() const	16	static
+../Core/Src/main.cpp:254:10:bool RingBuffer::isFull() const	16	static
+../Core/Src/main.cpp:258:10:bool RingBuffer::push()	16	static
+../Core/Src/main.cpp:266:10:bool RingBuffer::pop()	16	static
+../Core/Src/main.cpp:290:10:bool UartDriver::recv(char*)	24	static
+../Core/Src/main.cpp:306:10:bool UartDriver::send(char)	16	static
 ../Core/Src/main.cpp:238:7:RingBuffer::RingBuffer()	16	static
-../Core/Src/main.cpp:291:7:Input::Input()	16	static
-../Core/Src/main.cpp:316:7:Output::Output()	16	static
-../Core/Src/main.cpp:358:7:Interactives::Interactives()	16	static
-../Core/Src/main.cpp:394:5:int main()	856	static
-../Core/Src/main.cpp:476:6:void SystemClock_Config()	88	static
-../Core/Src/main.cpp:517:6:void Error_Handler()	4	static,ignoring_inline_asm
+../Core/Src/main.cpp:282:7:UartDriver::UartDriver()	16	static
+../Core/Src/main.cpp:326:6:void HAL_UART_RxCpltCallback(UART_HandleTypeDef*)	16	static
+../Core/Src/main.cpp:331:6:void HAL_UART_TxCpltCallback(UART_HandleTypeDef*)	16	static
+../Core/Src/main.cpp:337:10:void Session::recordActivity()	16	static
+../Core/Src/main.cpp:342:14:uint32_t Session::getDurationFromLastSessionActivity()	16	static
+../Core/Src/main.cpp:350:10:bool Session::isSessionTimeouted()	16	static
+../Core/Src/main.cpp:354:10:void Session::abortSession()	16	static
+../Core/Src/main.cpp:366:10:bool Interactives::askNewCode(char*, uint8_t, Session)	32	static
+../Core/Src/main.cpp:397:5:int main()	72	static
+../Core/Src/main.cpp:478:6:void SystemClock_Config()	88	static
+../Core/Src/main.cpp:519:6:void Error_Handler()	4	static,ignoring_inline_asm
+../Core/Src/main.cpp:526:1:void __static_initialization_and_destruction_0(int, int)	16	static
+../Core/Src/main.cpp:526:1:cpp)	8	static
