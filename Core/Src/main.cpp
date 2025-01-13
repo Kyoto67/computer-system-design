@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "gpio.h"
+#include "usart.h"
 //#include "stdio.h"
 #include <cstdint>
 #include <cctype>
@@ -117,31 +118,6 @@ private:
     }
 };
 
-class Signal : private Timer {
-public:
-    Signal(uint32_t minLongSignalLength) :
-            minLongSignalLength(minLongSignalLength) {
-    }
-
-    using Timer::begin;
-
-    SignalType end() {
-        Timer::end();
-
-        if (Timer::duration() > minLongSignalLength) {
-            return LONG_SIGNAL;
-        }
-        if (Timer::duration() > maxBounceLength) {
-            return SHORT_SIGNAL;
-        }
-
-        return BOUNCE;
-    }
-
-private:
-    uint32_t maxBounceLength = 10;
-    uint32_t minLongSignalLength;
-};
 
 class Lock {
 public:
@@ -234,8 +210,8 @@ private:
 
 class Input {
 public:
-    static bool readChar() {
-        return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) &c, 1, 1);
+    bool readChar() {
+        return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) &buffer, 1, 1);
     }
 
     char getChar() const {
@@ -250,10 +226,6 @@ class Output {
 public:
     void printChar(char *c) {
         HAL_UART_Transmit(&huart6, (uint8_t *) c, 1, 10);
-    }
-
-    void printString(char[] s) {
-        HAL_UART_Transmit(&huart6, (uint8_t *) s, sizeof(s), 10);
     }
 
 };
@@ -326,15 +298,15 @@ int main(void) {
 
     /* Initialize all configured peripherals */
     MX_GPIO_Init();
+    MX_USART6_UART_Init();
     /* USER CODE BEGIN 2 */
-
+    char msg[] = "Hello World\n";
+    HAL_UART_Transmit(&huart6, (uint8_t *) msg, sizeof(msg), 10);
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1) {
-        HAL_Delay(1000);
-
         if (input.readChar()) {
             char c = input.getChar();
             output.printChar(&c);
