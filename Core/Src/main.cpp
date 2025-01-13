@@ -223,6 +223,7 @@ private:
 
 
 class InterruptGuard {
+public:
     InterruptGuard() : pmask(__get_PRIMASK()) {
         __disable_irq();
     }
@@ -277,7 +278,7 @@ public:
     enum Mode {
         INT,
         BLOCK
-    }
+    };
 
 
     void setMode(Mode n_mode) {
