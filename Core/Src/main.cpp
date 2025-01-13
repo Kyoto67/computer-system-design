@@ -1,7 +1,7 @@
 /* USER CODE BEGIN Header */
 /**
  ******************************************************************************
- * @file           : main.c
+ * @file           : main.cpp
  * @brief          : Main program body
  ******************************************************************************
  * @attention
@@ -16,20 +16,21 @@
  ******************************************************************************
  */
 /* USER CODE END Header */
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "gpio.h"
 //#include "stdio.h"
 #include <cstdint>
+#include <cctype>
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -38,28 +39,21 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 //extern void initialise_monitor_handles(void);
-enum SignalType {
-    SHORT_SIGNAL, LONG_SIGNAL, TIMEOUT, BOUNCE
-};
-
 enum LockResponse {
     CORRECT, WRONG, OPEN, BLOCKED
 };
@@ -85,7 +79,7 @@ public:
 
 private:
     uint32_t startTime = 0;
-    uint32_t endTime = 0;   
+    uint32_t endTime = 0;
 };
 
 class Timeout : private Timer {
@@ -95,7 +89,7 @@ public:
 
     TimeoutResult wait() {
         Timer::begin();
-        while(!predicate()) {
+        while (!predicate()) {
             Timer::end();
             if (Timer::duration() > timeout) {
                 return EXPIRED;
@@ -106,6 +100,7 @@ public:
 
 private:
     bool (*predicate)(void);
+
     uint32_t timeout;
 };
 
@@ -122,7 +117,7 @@ private:
     }
 };
 
-class Signal: private Timer {
+class Signal : private Timer {
 public:
     Signal(uint32_t minLongSignalLength) :
             minLongSignalLength(minLongSignalLength) {
@@ -135,7 +130,7 @@ public:
 
         if (Timer::duration() > minLongSignalLength) {
             return LONG_SIGNAL;
-        } 
+        }
         if (Timer::duration() > maxBounceLength) {
             return SHORT_SIGNAL;
         }
@@ -148,54 +143,24 @@ private:
     uint32_t minLongSignalLength;
 };
 
-class SignalListener {
-public:
-    SignalType listen() {
-        Signal signal(1500);
-
-        TimeoutResult signalBeginsBeforeTimeout = Timeout(&isButtonPressed, 30000).wait();
-
-        if (signalBeginsBeforeTimeout == EXPIRED) {
-            return TIMEOUT;
-        }
-
-        signal.begin();
-        Timeout(&isButtonReleased).wait();
-        SignalType signalType = signal.end();
-
-        if (signalType == BOUNCE) {
-            return listen();
-        } 
-        return signalType;
-    }
-
-private:
-    static bool isButtonPressed() {
-        return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
-    }
-
-    static bool isButtonReleased() {
-        return !isButtonPressed();
-    }
-};
-
 class Lock {
 public:
-    LockResponse tryUnlock(SignalType signal) {
-        if (isCorrectInput(signal)) {
+    LockResponse tryUnlock(char input) {
+        if (isCorrectInput(input)) {
             pinPosition++;
             if (isOpen()) {
                 reset();
                 return OPEN;
             }
             return CORRECT;
-        } 
-        
+        }
+
         currentWrongAttempts++;
         if (isBlocked()) {
             reset();
             return BLOCKED;
-        } 
+        }
+        reset();
         return WRONG;
     }
 
@@ -206,8 +171,7 @@ public:
 
 private:
     uint8_t pinPosition = 0;
-    SignalType code[8] = {SHORT_SIGNAL, LONG_SIGNAL, SHORT_SIGNAL, LONG_SIGNAL,
-                          SHORT_SIGNAL, LONG_SIGNAL, SHORT_SIGNAL, LONG_SIGNAL};
+    char code[8] = {'z', 'z', 'z', 'z', 'z', 'z', 'z', 'z'};
     uint8_t wrongAttemptsAvailable = 3;
     uint8_t currentWrongAttempts = 0;
 
@@ -219,8 +183,8 @@ private:
         return currentWrongAttempts == wrongAttemptsAvailable;
     }
 
-    bool isCorrectInput(SignalType signal) {
-        return code[pinPosition] == signal;
+    bool isCorrectInput(char input) {
+        return std::tolower(code[pinPosition]) == std::tolower(input);
     }
 
 };
@@ -268,6 +232,65 @@ private:
     bool isSessionStarted = false;
 };
 
+class Input {
+public:
+    static bool readChar() {
+        return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) &c, 1, 1);
+    }
+
+    char getChar() const {
+        return buffer;
+    }
+
+private:
+    char buffer;
+};
+
+class Output {
+public:
+    void printChar(char *c) {
+        HAL_UART_Transmit(&huart6, (uint8_t *) c, 1, 10);
+    }
+
+    void printString(char[] s) {
+        HAL_UART_Transmit(&huart6, (uint8_t *) s, sizeof(s), 10);
+    }
+
+};
+
+class Session {
+public:
+    void ensureForSessionStarted() {
+        if (!isSessionStarted) {
+            sessionStart = HAL_GetTick();
+        }
+        isSessionStarted = true;
+    }
+
+    uint32_t getSessionDuration() {
+        if (isSessionStarted) {
+            return HAL_GetTick() - sessionStart;
+        } else {
+            return 0;
+        }
+    }
+
+    bool isSessionTimeouted() {
+        return getSessionDuration() > timeout;
+    }
+
+    void abortSession() {
+        isSessionStarted = false;
+    }
+
+private:
+    bool isSessionStarted;
+    uint32_t sessionStart;
+    uint32_t timeout;
+};
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -276,10 +299,12 @@ private:
  */
 int main(void) {
     /* USER CODE BEGIN 1 */
-//	initialise_monitor_handles();
-    SignalListener signalListener;
+// initialise_monitor_handles();
     Lock lock;
     LampControl lampControl;
+    Input input;
+    Output output;
+    Session session;
 
     /* USER CODE END 1 */
 
@@ -308,13 +333,13 @@ int main(void) {
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1) {
-//		printf("Hello world!\n");
-        SignalType signal = signalListener.listen();
-        if (signal == TIMEOUT) {
-            lock.reset();
-            lampControl.reset();
-        } else {
-            switch (lock.tryUnlock(signal)) {
+        HAL_Delay(1000);
+
+        if (input.readChar()) {
+            char c = input.getChar();
+            output.printChar(&c);
+            session.ensureForSessionStarted();
+            switch (lock.tryUnlock(c)) {
                 case CORRECT:
                     lampControl.correct();
                     break;
@@ -328,12 +353,18 @@ int main(void) {
                     lampControl.blocked();
                     break;
             }
+        } else {
+            if (session.isSessionTimeouted()) {
+                session.abortSession();
+                lock.reset();
+                lampControl.reset();
+            }
         }
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
     }
-    /* USER CODE END 3 */
+/* USER CODE END 3 */
 }
 
 /**
@@ -375,7 +406,6 @@ void SystemClock_Config(void) {
 }
 
 /* USER CODE BEGIN 4 */
-
 /* USER CODE END 4 */
 
 /**
