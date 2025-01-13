@@ -434,12 +434,16 @@ public:
             }
         } else {
             if (isButtonPressed()) {
+                if (!buttonWasPressed) {
+                	buttonPressedFrom = HAL_GetTick();
+                }
                 buttonWasPressed = true;
-                buttonPressedFrom = HAL_GetTick();
             } else {
                 if (buttonWasPressed) {
-                    uint32_t buttonPressDuration = HAL_GetTick() - buttonPressedFrom;
+                	uint32_t currTime = HAL_GetTick();
+                	uint32_t buttonPressDuration = currTime - buttonPressedFrom;
                     if (buttonPressDuration > bounceLengthBorder) {
+                    	buttonWasPressed = false;
                         return UserCommandDto(TOGGLE_IT_MODE, c);
                     }
                 }
