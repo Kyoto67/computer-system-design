@@ -239,38 +239,48 @@ class RingBuffer {
 public:
     static const int MAX_CAPACITY = 256;
 
-    char* push(bool* result) {
-        InterruptGuard guard{};
-        if(isFull()) {
-            *result = false;
-            return nullptr;
-        }
-        *result = true;
-        return &buffer[tail++];
+    char* tail() {
+        return &_buffer[_tail];
     }
 
-    char* pop(bool* result) {
-        InterruptGuard guard{};
-        if(isEmpty()) {
-            *result = false;
-            return nullptr;
-        }
-
-        *result = true;
-        return &buffer[head++];
+    char* head() {
+        return &_buffer[_head];
     }
 
-private:
     bool isEmpty() const {
-        return head == tail;
+        return _head == _tail;
     }
 
     bool isFull() const {
-        return tail + 1 == head;
+        return _tail + 1 == _head;
     }
 
-    uint8_t head = 0, tail = 0;
-    char buffer[MAX_CAPACITY];
+    bool pop() {
+        return &_buffer[_head];
+    }
+
+    bool push() {
+        if (isFull()) {
+            return false;
+        }
+        _tail++;
+        return true;
+    }
+
+    bool pop() {
+        if (isEmpty()) {
+            return false;
+        }
+        _head++;
+        return true;
+    }
+
+
+private:
+
+
+    uint8_t _head = 0, _tail = 0;
+    char _buffer[MAX_CAPACITY];
 };
 
 class UartDriver {
@@ -281,50 +291,48 @@ public:
     };
 
 
-    void setMode(Mode n_mode) {
-        current = n_mode;
-    }
-private:
-    Mode current;
-};
-
-class Input {
-public:
-    bool readChar() {
-        char buf;
-        if (HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) &buf, 1, 1)) {
-            bool result = true;
-            *buffer.push(&result) = buf;
-            return result;
+    bool recv(char* c) {
+        switch (current) {
+        case INT: {
+            char* head = input.head();
+            if(!input.pop()) {
+                HAL_UART_Receive_IT(&huart6, (uint8_t *) &input.tail(), 1, 1);
+                return false;
+            }
+            *c = *head;
+            return true;
+        }break;
+        case BLOCK: return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) &c, 1, 1);
         }
-        return false;
     }
 
-    char getChar() {
-        bool ret = false;
-        char c;
-        while (!ret) {
-            c = *buffer.pop(&ret);
+    bool send(char c) {
+        switch (current) {
+        case INT: {
+            if(output.push()) {
+                *output.tail() = c;
+                HAL_UART_Receive_IT(&huart6, (uint8_t *) &output.tail(), 1, 1);
+                return true;
+            }
+            return false;
+        } break;
+        case BLOCK: return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 10);
         }
-        return c;
     }
 
-private:
-    RingBuffer buffer;
-};
+    RingBuffer input;
+    RingBuffer output;
+    Mode current = BLOCK;
+} DRIVER;
 
-class Output {
-public:
-    bool printChar(char c) {
-        bool result = true;
-        *buffer.push(&result) = c;
-        return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) buffer.pop(&result), 1, 10) && result;
-    }
+void HAL_UART_RxCpltCallback(HAL_HandleTypeDef * huart) {
+    DRIVER.input.push();
+    HAL_UART_Receive_IT(&huart6, (uint8_t *) &driver.input.tail(), 1, 1);
+}
 
-
-private:
-    RingBuffer buffer;
-};
+void HAL_UART_TxCpltCallback(HAL_HandleTypeDef * huart) {
+    DRIVER.output.pop();
+}
 
 class Session {
 public:
