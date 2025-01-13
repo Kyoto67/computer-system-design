@@ -215,6 +215,7 @@ private:
 
 
 class RingBuffer {
+public:
     static const int MAX_CAPACITY = 256;
 
 
@@ -242,7 +243,7 @@ class RingBuffer {
     }
 
     bool isFull() const {
-        return tail + 1 = head;
+        return tail + 1 == head;
     }
 
 private:
@@ -254,15 +255,22 @@ private:
 class Input {
 public:
 	bool readChar() {
-        bool result = true;
-        return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t*) buffer.push(&result), 1, 1) && result;
+        char buf;
+        if(HAL_OK == HAL_UART_Receive(&huart6, (uint8_t*) &buf, 1, 1)) {
+            bool result = true;
+            *buffer.push(&result) = buf;
+            return result;
+        }
+        return false;
 	}
 
 	char getChar() {
-        char ret;
-        while(!buffer.pop(&ret)) {
+        bool ret = false;
+        char c;
+        while(!ret) {
+        	c = *buffer.pop(&ret);
         }
-		return ret;
+		return c;
 	}
 
 private:
@@ -273,7 +281,7 @@ class Output {
 public:
 	bool printChar(char c) {
         bool result = true;
-        *buffer.push(result) = c;
+        *buffer.push(&result) = c;
         return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t*) buffer.pop(&result), 1, 10) && result;
 	}
 

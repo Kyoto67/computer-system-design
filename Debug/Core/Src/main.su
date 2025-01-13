@@ -18,13 +18,20 @@
 ../Core/Src/main.cpp:189:7:void LampControl::wrong()	32	static
 ../Core/Src/main.cpp:195:7:void LampControl::blocked()	40	static
 ../Core/Src/main.cpp:203:7:void LampControl::reset()	32	static
-../Core/Src/main.cpp:218:7:bool Input::readChar()	16	static
-../Core/Src/main.cpp:222:7:char Input::getChar() const	16	static
-../Core/Src/main.cpp:232:7:void Output::printChar(char*)	16	static
-../Core/Src/main.cpp:240:7:void Session::ensureForSessionStarted()	16	static
-../Core/Src/main.cpp:247:11:uint32_t Session::getSessionDuration()	16	static
-../Core/Src/main.cpp:255:7:bool Session::isSessionTimeouted()	16	static
-../Core/Src/main.cpp:259:7:void Session::abortSession()	16	static
-../Core/Src/main.cpp:275:5:int main()	48	static
-../Core/Src/main.cpp:347:6:void SystemClock_Config()	88	static
-../Core/Src/main.cpp:388:6:void Error_Handler()	4	static,ignoring_inline_asm
+../Core/Src/main.cpp:222:11:char* RingBuffer::push(bool*)	16	static
+../Core/Src/main.cpp:231:11:char* RingBuffer::pop(bool*)	16	static
+../Core/Src/main.cpp:241:10:bool RingBuffer::isEmpty() const	16	static
+../Core/Src/main.cpp:245:10:bool RingBuffer::isFull() const	16	static
+../Core/Src/main.cpp:257:7:bool Input::readChar()	24	static
+../Core/Src/main.cpp:267:7:char Input::getChar()	24	static
+../Core/Src/main.cpp:282:7:bool Output::printChar(char)	24	static
+../Core/Src/main.cpp:295:7:void Session::ensureForSessionStarted()	16	static
+../Core/Src/main.cpp:302:11:uint32_t Session::getSessionDuration()	16	static
+../Core/Src/main.cpp:310:7:bool Session::isSessionTimeouted()	16	static
+../Core/Src/main.cpp:314:7:void Session::abortSession()	16	static
+../Core/Src/main.cpp:217:7:RingBuffer::RingBuffer()	16	static
+../Core/Src/main.cpp:255:7:Input::Input()	16	static
+../Core/Src/main.cpp:280:7:Output::Output()	16	static
+../Core/Src/main.cpp:330:5:int main()	560	static
+../Core/Src/main.cpp:402:6:void SystemClock_Config()	88	static
+../Core/Src/main.cpp:443:6:void Error_Handler()	4	static,ignoring_inline_asm
