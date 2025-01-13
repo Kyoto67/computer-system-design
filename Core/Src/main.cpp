@@ -222,13 +222,25 @@ private:
 };
 
 
+class InterruptGuard {
+    InterruptGuard() : pmask(__get_PRIMASK()) {
+        __disable_irq();
+    }
+
+    ~InterruptGuard() {
+        __set_PRIMASK(pmask);
+    }
+private:
+    uint32_t pmask;
+};
+
 class RingBuffer {
 public:
     static const int MAX_CAPACITY = 256;
 
-
-    char *push(bool *result) {
-        if (isFull()) {
+    char* push(bool* result) {
+        InterruptGuard guard{};
+        if(isFull()) {
             *result = false;
             return nullptr;
         }
@@ -236,8 +248,9 @@ public:
         return &buffer[tail++];
     }
 
-    char *pop(bool *result) {
-        if (isEmpty()) {
+    char* pop(bool* result) {
+        InterruptGuard guard{};
+        if(isEmpty()) {
             *result = false;
             return nullptr;
         }
@@ -246,6 +259,7 @@ public:
         return &buffer[head++];
     }
 
+private:
     bool isEmpty() const {
         return head == tail;
     }
@@ -254,11 +268,24 @@ public:
         return tail + 1 == head;
     }
 
-private:
     uint8_t head = 0, tail = 0;
     char buffer[MAX_CAPACITY];
 };
 
+class UartDriver {
+public:
+    enum Mode {
+        INT,
+        BLOCK
+    }
+
+
+    void setMode(Mode n_mode) {
+        current = n_mode;
+    }
+private:
+    Mode current;
+};
 
 class Input {
 public:
