@@ -423,7 +423,7 @@ private:
 
 class UserListener {
 public:
-    static UserCommandDto listenCommand() {
+    UserCommandDto listenCommand() {
         char c;
         if (DRIVER.recv(&c)) {
             DRIVER.send(c);
@@ -449,16 +449,14 @@ public:
         }
     }
 
-    static bool isButtonPressed() {
+    bool isButtonPressed() {
         return HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_15) == 0;
     }
 
 private:
-    static bool buttonWasPressed;
-    static uint32_t buttonPressedFrom;
-    const static uint32_t bounceLengthBorder = 10;
-
-
+    bool buttonWasPressed = false;
+    uint32_t buttonPressedFrom = 0;
+    const uint32_t bounceLengthBorder = 10;
 };
 /* USER CODE END 0 */
 
@@ -473,6 +471,7 @@ int main(void) {
     LampControl lampControl;
     Session session;
     Interactives interactives;
+    UserListener userListener;
 
     /* USER CODE END 1 */
 
@@ -502,7 +501,7 @@ int main(void) {
     /* USER CODE BEGIN WHILE */
     DRIVER.current = UartDriver::Mode::INT;
     while (1) {
-        UserCommandDto command = UserListener::listenCommand();
+        UserCommandDto command = userListener.listenCommand();
         switch (command.getUserInstruction()) {
             case SET_PASSCODE:
                 session.recordActivity();
