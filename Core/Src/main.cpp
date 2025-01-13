@@ -433,7 +433,6 @@ int main(void) {
     while (1) {
         char c;
         if (DRIVER.recv(&c)) {
-            DRIVER.send(c);
             if (c == '+') {
                 char newCode[9];
                 if (interactives.askNewCode(newCode, 9, session)) {
@@ -442,7 +441,7 @@ int main(void) {
                 session.abortSession();
                 lampControl.reset();
             } else {
-                output.printChar(c);
+                DRIVER.send(c);
                 session.recordActivity();
                 switch (lock.tryUnlock(c)) {
                     case CORRECT:
