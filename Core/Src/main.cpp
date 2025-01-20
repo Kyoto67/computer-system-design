@@ -162,7 +162,7 @@ private:
     uint8_t currentWrongAttempts = 0;
 
     bool isOpen() {
-        return code[pinPosition + 1] == 0;
+        return code[pinPosition] == 0;
     }
 
     bool isBlocked() {
@@ -338,6 +338,21 @@ public:
     Mode current = BLOCK;
 } DRIVER;
 
+
+class Printer {
+public:
+	static void printChar(char c) {
+		while(!DRIVER.send(c));
+	}
+
+	static void printString(char* arr, uint32_t size) {
+		for (uint32_t i=0; i<size; i++) {
+			printChar(arr[i]);
+		}
+	}
+
+};
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef * huart) {
     InterruptGuard guard{};
     DRIVER.input.push();
@@ -383,12 +398,10 @@ public:
     bool askNewCode(char toFill[], uint8_t len, Session currentSession) {
         char inputInvite[] = "\nPlease, input the new passcode: ";
         char tmp[len];
-        for (char c: inputInvite) {
-            DRIVER.send(c);
-        }
+        Printer::printString(inputInvite, sizeof(inputInvite)/sizeof(char));
         for (int i = 0; i < len; ++i) {
             char c;
-            while (DRIVER.recv(&c)) {
+            while (!DRIVER.recv(&c)) {
                 if (currentSession.isSessionTimeouted()) {
                     currentSession.abortSession();
                     return false;
@@ -405,18 +418,14 @@ public:
             }
         }
         char repeatNewPasscodeMessage[] = "\nThe new passcode will be: ";
-        for (char c: repeatNewPasscodeMessage) {
-            DRIVER.send(c);
-        }
-        for (char c: tmp) {
-            DRIVER.send(c);
-        }
+        Printer::printString(repeatNewPasscodeMessage, sizeof(repeatNewPasscodeMessage)/sizeof(char));
+        Printer::printString(tmp, sizeof(tmp)/sizeof(char));
         char confirmingMessage[] = "\nConfirm? (y/n): ";
-        for (char c: confirmingMessage) {
-            DRIVER.send(c);
-        }
+        Printer::printString(confirmingMessage, sizeof(confirmingMessage)/sizeof(char));
         char c;
-        while (DRIVER.recv(&c));
+        while (!DRIVER.recv(&c));
+        Printer::printChar(c);
+        Printer::printChar('\n');
         if (c == 'y') {
             for (int i = 0; i < len; i++) {
                 toFill[i] = tmp[i];

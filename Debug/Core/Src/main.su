@@ -33,20 +33,23 @@
 ../Core/Src/main.cpp:320:10:bool UartDriver::send(char)	32	static
 ../Core/Src/main.cpp:244:7:RingBuffer::RingBuffer()	16	static
 ../Core/Src/main.cpp:288:7:UartDriver::UartDriver()	16	static
-../Core/Src/main.cpp:341:6:void HAL_UART_RxCpltCallback(UART_HandleTypeDef*)	24	static
-../Core/Src/main.cpp:347:6:void HAL_UART_TxCpltCallback(UART_HandleTypeDef*)	24	static
-../Core/Src/main.cpp:354:10:void Session::recordActivity()	16	static
-../Core/Src/main.cpp:359:14:uint32_t Session::getDurationFromLastSessionActivity()	16	static
-../Core/Src/main.cpp:367:10:bool Session::isSessionTimeouted()	16	static
-../Core/Src/main.cpp:371:10:void Session::abortSession()	16	static
-../Core/Src/main.cpp:383:10:bool Interactives::askNewCode(char*, uint8_t, Session)	32	static
-../Core/Src/main.cpp:415:5:UserCommandDto::UserCommandDto(UserInstruction, char)	16	static
-../Core/Src/main.cpp:417:10:char UserCommandDto::getUserInput()	16	static
-../Core/Src/main.cpp:421:21:UserInstruction UserCommandDto::getUserInstruction()	16	static
-../Core/Src/main.cpp:432:20:UserCommandDto UserListener::listenCommand()	48	static
-../Core/Src/main.cpp:462:10:bool UserListener::isButtonPressed()	16	static
-../Core/Src/main.cpp:477:5:int main()	96	static
-../Core/Src/main.cpp:565:6:void SystemClock_Config()	88	static
-../Core/Src/main.cpp:606:6:void Error_Handler()	4	static,ignoring_inline_asm
-../Core/Src/main.cpp:613:1:void __static_initialization_and_destruction_0(int, int)	16	static
-../Core/Src/main.cpp:613:1:cpp)	8	static
+../Core/Src/main.cpp:344:14:static void Printer::printChar(char)	16	static
+../Core/Src/main.cpp:348:14:static void Printer::printString(char*, uint32_t)	24	static
+../Core/Src/main.cpp:356:6:void HAL_UART_RxCpltCallback(UART_HandleTypeDef*)	24	static
+../Core/Src/main.cpp:362:6:void HAL_UART_TxCpltCallback(UART_HandleTypeDef*)	24	static
+../Core/Src/main.cpp:369:10:void Session::recordActivity()	16	static
+../Core/Src/main.cpp:374:14:uint32_t Session::getDurationFromLastSessionActivity()	16	static
+../Core/Src/main.cpp:382:10:bool Session::isSessionTimeouted()	16	static
+../Core/Src/main.cpp:386:10:void Session::abortSession()	16	static
+../Core/Src/main.cpp:398:10:bool Interactives::askNewCode(char*, uint8_t, Session)	160	dynamic
+../Core/Src/main.cpp:443:10:bool ToggleDriver::isToggleActivated()	24	static
+../Core/Src/main.cpp:467:10:bool ToggleDriver::isButtonPressed()	16	static
+../Core/Src/main.cpp:478:5:UserCommandDto::UserCommandDto(UserInstruction, char)	16	static
+../Core/Src/main.cpp:480:10:char UserCommandDto::getUserInput()	16	static
+../Core/Src/main.cpp:484:21:UserInstruction UserCommandDto::getUserInstruction()	16	static
+../Core/Src/main.cpp:495:20:UserCommandDto UserListener::listenCommand()	40	static
+../Core/Src/main.cpp:523:5:int main()	96	static
+../Core/Src/main.cpp:610:6:void SystemClock_Config()	88	static
+../Core/Src/main.cpp:651:6:void Error_Handler()	4	static,ignoring_inline_asm
+../Core/Src/main.cpp:658:1:void __static_initialization_and_destruction_0(int, int)	16	static
+../Core/Src/main.cpp:658:1:cpp)	8	static
