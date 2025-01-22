@@ -318,19 +318,4 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 
 /* USER CODE BEGIN 1 */
 
-void tick() {
-
-}
-
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-	int isEntire = 0;
-	if (htim->Instance == TIM6) {
-		isEntire = 1;
-	}
-	if (isEntire) {
-		tick();
-	}
-}
-
 /* USER CODE END 1 */

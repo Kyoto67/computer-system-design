@@ -63,11 +63,11 @@ void SystemClock_Config(void);
 class UartDriver {
 public:
 	bool recv(char *c) {
-		return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t*) c, 1, 1);
+		return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t*) c, 1, 0);
 	}
 
 	bool send(char c) {
-		return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t*) &c, 1, 10);
+		return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t*) &c, 1, 1);
 	}
 
 } DRIVER;
@@ -644,22 +644,22 @@ void printResults(std::deque<uint32_t> points,
 
 ImpulsePlayer player;
 
-//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-//	bool isEntire = false;
-//	if (htim->Instance == TIM6) {
-//		isEntire = true;
-//	}
-//}
-
-void stopTimer() {
-	HAL_TIM_Base_Stop_IT(&htim6);
-	htim6.Instance->ARR = 0;
-}
-
 void set_timer_ms(uint32_t ms) {
     htim6.Instance->ARR = ms - 1;
     HAL_TIM_Base_Start_IT(&htim6);
 }
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+	if (htim->Instance == TIM6) {
+		Reader::tick();
+		player.tick();
+	}
+}
+
+//void stopTimer() {
+//	HAL_TIM_Base_Stop_IT(&htim6);
+//	htim6.Instance->ARR = 0;
+//}
 
 
 void init_led_pwm() {
@@ -708,7 +708,7 @@ int main(void) {
 	HAL_TIM_Base_Start_IT(&htim1);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
-	stopTimer();
+//	stopTimer();
 	init_led_pwm();
     set_timer_ms(10);
 	/* USER CODE END 2 */

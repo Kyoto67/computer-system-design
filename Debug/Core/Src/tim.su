@@ -6,5 +6,3 @@
 ../Core/Src/tim.c:223:6:HAL_TIM_MspPostInit	48	static
 ../Core/Src/tim.c:273:6:HAL_TIM_PWM_MspDeInit	16	static
 ../Core/Src/tim.c:300:6:HAL_TIM_Base_MspDeInit	16	static
-../Core/Src/tim.c:321:6:tick	4	static
-../Core/Src/tim.c:326:6:HAL_TIM_PeriodElapsedCallback	24	static
