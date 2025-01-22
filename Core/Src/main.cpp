@@ -541,7 +541,7 @@ public:
     void clear() {
         points.clear();
         roundResults.clear();
-        musicImpulseSequence();
+        musicImpulseSequence = MusicImpulseSequence();
     }
 
 private:
