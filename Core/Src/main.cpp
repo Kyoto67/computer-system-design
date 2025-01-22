@@ -501,10 +501,12 @@ private:
     }
 };
 
+ImpulsePlayer player;
+
 class MusicGame {
 public:
     MusicGame(MusicImpulseSequence seq, ImpulsePlayer ply) :
-            musicImpulseSequence(seq), player(ply), currentDifficultyMode(0) {
+            musicImpulseSequence(seq), player1(ply), currentDifficultyMode(0) {
     }
 
     void play() {
@@ -543,7 +545,7 @@ public:
 
 private:
     MusicImpulseSequence musicImpulseSequence;
-    ImpulsePlayer player;
+    ImpulsePlayer player1;
     std::deque<uint32_t> points;
     std::deque<RoundResult> roundResults;
 
@@ -577,7 +579,7 @@ private:
         while (true) {
             if (Reader::canRead()) {
                 char input = Reader::read();
-                if (input == 10) {
+                if (input == '\r') {
                     return BREAK;
                 }
                 Impulse impulse = ImpulseResolver::resolveFor(input);
@@ -636,8 +638,6 @@ void printResults(std::deque<uint32_t> points,
         Writer::printChar('\n');
     }
 }
-
-ImpulsePlayer player;
 
 void set_timer_ms(uint32_t ms) {
     htim6.Instance->ARR = ms - 1;
@@ -718,7 +718,7 @@ int main(void) {
                     player.switchMode();
                     printSwitchMode();
                     break;
-                case 10:
+                case '\r':
                     game.play();
                     printResults(game.getPoints(), game.getRoundResults());
                     game.clear();
