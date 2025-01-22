@@ -656,6 +656,12 @@ void stopTimer() {
 	htim6.Instance->ARR = 0;
 }
 
+void set_timer_ms(uint32_t ms) {
+    htim6.Instance->ARR = ms - 1;
+    HAL_TIM_Base_Start_IT(&htim6);
+}
+
+
 void init_led_pwm() {
 	htim4.Instance->ARR = CLOCK_SCALED_FREQUENCY / LED_PWM_FREQUENCY;
 }
@@ -704,6 +710,7 @@ int main(void) {
 
 	stopTimer();
 	init_led_pwm();
+    set_timer_ms(10);
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
