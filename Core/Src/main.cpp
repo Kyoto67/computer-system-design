@@ -521,8 +521,10 @@ public:
                 roundResults.push_back(roundResult);
                 points.push_back(calculatePointsFor(roundResult));
             }
+
+            HAL_Delay(400);
         }
-        HAL_Delay(300);
+
     }
 
     void switchDifficulty() {
@@ -630,7 +632,7 @@ void printResults(std::deque<uint32_t> points,
     Writer::printString("\nРезультаты игры:\n");
     for (size_t i = 0; i < points.size(); i++) {
         Writer::printString("Раунд ");
-        Writer::printNumber(i);
+        Writer::printNumber(i + 1);
         Writer::printString(": ");
         Writer::printString(translateRoundResult(roundResults[i]));
         Writer::printString(", очков ");
