@@ -505,8 +505,8 @@ ImpulsePlayer player;
 
 class MusicGame {
 public:
-    MusicGame(MusicImpulseSequence seq, ImpulsePlayer ply) :
-            musicImpulseSequence(seq), player1(ply), currentDifficultyMode(0) {
+    MusicGame() :
+            musicImpulseSequence(), currentDifficultyMode(0) {
     }
 
     void play() {
@@ -541,11 +541,11 @@ public:
     void clear() {
         points.clear();
         roundResults.clear();
+        musicImpulseSequence();
     }
 
 private:
     MusicImpulseSequence musicImpulseSequence;
-    ImpulsePlayer player1;
     std::deque<uint32_t> points;
     std::deque<RoundResult> roundResults;
 
@@ -651,12 +651,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     }
 }
 
-//void stopTimer() {
-//	HAL_TIM_Base_Stop_IT(&htim6);
-//	htim6.Instance->ARR = 0;
-//}
-
-
 void init_led_pwm() {
     htim4.Instance->ARR = CLOCK_SCALED_FREQUENCY / LED_PWM_FREQUENCY;
 }
@@ -678,7 +672,7 @@ int main(void) {
 
     /* USER CODE BEGIN Init */
     MusicImpulseSequence musicImpulseSequence;
-    MusicGame game = MusicGame(musicImpulseSequence, player);
+    MusicGame game = MusicGame();
     /* USER CODE END Init */
 
     /* Configure the system clock */
@@ -703,7 +697,6 @@ int main(void) {
     HAL_TIM_Base_Start_IT(&htim1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
-//	stopTimer();
     init_led_pwm();
     set_timer_ms(10);
     /* USER CODE END 2 */
