@@ -510,7 +510,6 @@ public:
     }
 
     void play() {
-        HAL_Delay(3000);
         while (musicImpulseSequence.hasNext()) {
             Impulse roundImpulse = musicImpulseSequence.next();
             player.push(roundImpulse);
@@ -712,6 +711,7 @@ int main(void) {
                     printSwitchMode();
                     break;
                 case '\r':
+                    printStartGame();
                     game.play();
                     printResults(game.getPoints(), game.getRoundResults());
                     game.clear();
