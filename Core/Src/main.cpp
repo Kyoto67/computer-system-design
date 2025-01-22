@@ -34,18 +34,18 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define CLOCK_SCALED_FREQUENCY    1000000        // frequency after scaling with PSC (supposed to be same on every timer in use)
-#define LED_PWM_FREQUENCY        500
-#define ENTER_ASCII                '\r'
-#define    INPUT_PORT_REG            (0x00)
-#define    OUTPUT_PORT_REG            (0x01)
-#define    POLARITY_INV_REG        (0x02)
-#define CONFIG_REG                (0x03)
-#define KEYPAD_ADDRESS            (0xE2)
-#define KEYPAD_WRITE_ADDRESS    ((KEYPAD_ADDRESS) & ~1)
-#define KEYPAD_READ_ADDRESS        ((KEYPAD_ADDRESS) | 1)
-#define COLUMN_MASK                0x7
-#define CONTACT_BOUNCE_MS        20
+#define CLOCK_SCALED_FREQUENCY	1000000		// frequency after scaling with PSC (supposed to be same on every timer in use)
+#define LED_PWM_FREQUENCY		500
+#define ENTER_ASCII				'\r'
+#define	INPUT_PORT_REG			(0x00)
+#define	OUTPUT_PORT_REG			(0x01)
+#define	POLARITY_INV_REG		(0x02)
+#define CONFIG_REG				(0x03)
+#define KEYPAD_ADDRESS			(0xE2)
+#define KEYPAD_WRITE_ADDRESS	((KEYPAD_ADDRESS) & ~1)
+#define KEYPAD_READ_ADDRESS		((KEYPAD_ADDRESS) | 1)
+#define COLUMN_MASK				0x7
+#define CONTACT_BOUNCE_MS		20
 
 /* USER CODE END PTD */
 
@@ -72,6 +72,84 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+class MatrixKeypadDriver {
+public:
+    void tick() {
+        int read = keypad_read_key_index();
+        if (read != -1) {
+            isExistsUnread = true;
+            input = read;
+        }
+    }
+
+    bool canRead() {
+        return isExistsUnread;
+    }
+
+    int read() {
+        isExistsUnread = false;
+        return input;
+    }
+
+private:
+    bool isExistsUnread = false;
+    int input = -1;
+    uint32_t last_pressed_time = 0;
+    int last_pressed_key_index = -1;
+
+    HAL_StatusTypeDef reset_keypad(void) {
+        uint8_t buf = 0;
+        HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, POLARITY_INV_REG, 1, &buf, 1, 100);
+        if (status != HAL_OK)
+            return status;
+        status = HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, OUTPUT_PORT_REG, 1, &buf, 1, 100);
+        return status;
+    }
+
+    int keypad_read_key_index(void) {
+        uint32_t cur_time = HAL_GetTick();
+        if (cur_time - last_pressed_time < CONTACT_BOUNCE_MS) return -1;
+
+        int key_index = -1;
+        uint8_t buf;
+        uint16_t pressed_column;
+
+        for (int row = 0; row < 4; row++) {
+            buf = ~((uint8_t)(1 << row));
+            pressed_column = 0x00;
+
+            reset_keypad();
+
+            HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, CONFIG_REG, 1, &buf, 1, 100);
+            HAL_Delay(10);
+            HAL_I2C_Mem_Read(&hi2c1, KEYPAD_READ_ADDRESS, INPUT_PORT_REG, 1, &buf, 1, 100);
+
+            pressed_column = (~(buf >> 4)) & COLUMN_MASK;
+            switch (pressed_column) {
+                case 0x1:
+                    if (key_index != -1) return -1;
+                    key_index = row * 3;
+                    break;
+                case 0x2:
+                    if (key_index != -1) return -1;
+                    key_index = (row * 3) + 1;
+                    break;
+                case 0x4:
+                    if (key_index != -1) return -1;
+                    key_index = (row * 3) + 2;
+                    break;
+            }
+        }
+
+        if (key_index != -1) last_pressed_time = cur_time;
+        if (key_index == last_pressed_key_index)
+            return -1;
+        last_pressed_key_index = key_index;
+        return key_index;
+    }
+} KEYPAD;
+
+
 class UartDriver {
 public:
     void tick() {
@@ -100,32 +178,6 @@ private:
     }
 
 } DRIVER;
-
-class MatrixKeypadDriver {
-public:
-    void tick() {
-        isExistsUnread = recv(&input) || isExistsUnread;
-    }
-
-    bool canRead() {
-        return isExistsUnread;
-    }
-
-    char read() {
-        isExistsUnread = false;
-        return input;
-    }
-
-private:
-    bool isExistsUnread;
-    char input;
-
-    bool recv(char *c) {
-        return HAL_OK == HAL_I2C_Master_Receive(&hi2c1, KEYPAD_READ_ADDRESS, (uint8_t *) c, 1, 0);
-    }
-
-} KEYPAD;
-
 
 class Writer {
 public:
