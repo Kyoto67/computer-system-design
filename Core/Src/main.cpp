@@ -197,23 +197,23 @@ class ImpulseResolver {
 public:
     static Impulse resolveFor(char c) {
         switch (c) {
-            case '0':
-                return Q;
             case '1':
-                return W;
+                return Q;
             case '2':
-                return E;
+                return W;
             case '3':
-                return A;
+                return E;
             case '4':
-                return S;
+                return A;
             case '5':
-                return D;
+                return S;
             case '6':
-                return Z;
+                return D;
             case '7':
-                return X;
+                return Z;
             case '8':
+                return X;
+            case '9':
                 return C;
             default:
                 return UNKNOWN;
@@ -522,6 +522,7 @@ public:
                 points.push_back(calculatePointsFor(roundResult));
             }
         }
+        HAL_Delay(300);
     }
 
     void switchDifficulty() {
