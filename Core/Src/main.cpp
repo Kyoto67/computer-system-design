@@ -94,6 +94,8 @@ public:
 private:
     bool isExistsUnread = false;
     int input = -1;
+    uint32_t last_pressed_time = 0;
+    int last_pressed_key_index = -1;
 
     HAL_StatusTypeDef reset_keypad(void) {
         uint8_t buf = 0;
@@ -151,7 +153,7 @@ private:
 class UartDriver {
 public:
     void tick() {
-        isExistsUnread = DRIVER.recv(&input) || isExistsUnread;
+        isExistsUnread = recv(&input) || isExistsUnread;
     }
 
     bool send(char c) {
