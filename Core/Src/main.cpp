@@ -60,14 +60,107 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+class MatrixKeypadDriver {
+public:
+    void tick() {
+        int read = keypad_read_key_index();
+        if (read != -1) {
+            isExistsUnread = true;
+            input = read;
+        }
+    }
+
+    bool canRead() {
+        return isExistsUnread;
+    }
+
+    int read() {
+        isExistsUnread = false;
+        return input;
+    }
+
+private:
+    bool isExistsUnread = false;
+    int input = -1;
+
+    HAL_StatusTypeDef reset_keypad(void) {
+        uint8_t buf = 0;
+        HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, POLARITY_INV_REG, 1, &buf, 1, 100);
+        if (status != HAL_OK)
+            return status;
+        status = HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, OUTPUT_PORT_REG, 1, &buf, 1, 100);
+        return status;
+    }
+
+    int keypad_read_key_index(void) {
+        uint32_t cur_time = HAL_GetTick();
+        if (cur_time - last_pressed_time < CONTACT_BOUNCE_MS) return -1;
+
+        int key_index = -1;
+        uint8_t buf;
+        uint16_t pressed_column;
+
+        for (int row = 0; row < 4; row++) {
+            buf = ~((uint8_t)(1 << row));
+            pressed_column = 0x00;
+
+            reset_keypad();
+
+            HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, CONFIG_REG, 1, &buf, 1, 100);
+            HAL_Delay(10);
+            HAL_I2C_Mem_Read(&hi2c1, KEYPAD_READ_ADDRESS, INPUT_PORT_REG, 1, &buf, 1, 100);
+
+            pressed_column = (~(buf >> 4)) & COLUMN_MASK;
+            switch (pressed_column) {
+                case 0x1:
+                    if (key_index != -1) return -1;
+                    key_index = row * 3;
+                    break;
+                case 0x2:
+                    if (key_index != -1) return -1;
+                    key_index = (row * 3) + 1;
+                    break;
+                case 0x4:
+                    if (key_index != -1) return -1;
+                    key_index = (row * 3) + 2;
+                    break;
+            }
+        }
+
+        if (key_index != -1) last_pressed_time = cur_time;
+        if (key_index == last_pressed_key_index)
+            return -1;
+        last_pressed_key_index = key_index;
+        return key_index;
+    }
+} KEYPAD;
+
+
 class UartDriver {
 public:
-    bool recv(char *c) {
-        return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 0);
+    void tick() {
+        isExistsUnread = DRIVER.recv(&input) || isExistsUnread;
     }
 
     bool send(char c) {
-        return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 1);
+        return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t * ) & c, 1, 1);
+    }
+
+    bool canRead() {
+        return isExistsUnread;
+    }
+
+    char read() {
+        isExistsUnread = false;
+        return input;
+    }
+
+private:
+    bool isExistsUnread;
+    char input;
+
+    bool recv(char *c) {
+        return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 0);
     }
 
 } DRIVER;
@@ -101,28 +194,23 @@ public:
     }
 };
 
-class Reader {
+class GlobalReader {
 public:
-    static void tick() {
-        isExistsUnread = DRIVER.recv(&input) || isExistsUnread;
+    bool canRead() {
+        return DRIVER.canRead() || KEYPAD.canRead();
     }
 
-    static bool canRead() {
-        return isExistsUnread;
+    char read() {
+        if (DRIVER.canRead()) {
+            return DRIVER.read();
+        }
+        if (KEYPAD.canRead()) {
+            return (char) KEYPAD.read() + 48;
+        }
+        return 0;
     }
 
-    static char read() {
-        isExistsUnread = false;
-        return input;
-    }
-
-private:
-    static bool isExistsUnread;
-    static char input;
-};
-
-bool Reader::isExistsUnread = false;
-char Reader::input = 0;
+} READER;
 
 class SoundDriver {
 public:
@@ -484,7 +572,7 @@ public:
 
 private:
     uint8_t mode;
-    std::deque<Impulse> queue;
+    std::deque <Impulse> queue;
     Impulse currentState = UNKNOWN;
     uint32_t currentStateStartTimestamp = 0;
     uint32_t actionsLength = 500;
@@ -536,11 +624,11 @@ public:
                                 % DIFFICULTY_MODES_COUNT;
     }
 
-    std::deque<uint32_t> getPoints() {
+    std::deque <uint32_t> getPoints() {
         return points;
     }
 
-    std::deque<RoundResult> getRoundResults() {
+    std::deque <RoundResult> getRoundResults() {
         return roundResults;
     }
 
@@ -553,8 +641,8 @@ public:
 
 private:
     MusicImpulseSequence musicImpulseSequence;
-    std::deque<uint32_t> points;
-    std::deque<RoundResult> roundResults;
+    std::deque <uint32_t> points;
+    std::deque <RoundResult> roundResults;
 
     const uint8_t DIFFICULTY_MODES_COUNT = 3;
     uint8_t currentDifficultyMode;
@@ -584,8 +672,8 @@ private:
     RoundResult nextRound(Impulse expectedImpulse, uint32_t timeout) {
         uint32_t startTime = HAL_GetTick();
         while (true) {
-            if (Reader::canRead()) {
-                char input = Reader::read();
+            if (READER.canRead()) {
+                char input = READER.read();
                 if (input == '\r') {
                     return BREAK;
                 }
@@ -632,8 +720,8 @@ void printSwitchDifficulty() {
     Writer::printString("\nСложность переключена.\n");
 }
 
-void printResults(std::deque<uint32_t> points,
-                  std::deque<RoundResult> roundResults) {
+void printResults(std::deque <uint32_t> points,
+                  std::deque <RoundResult> roundResults) {
     Writer::printString("\nРезультаты игры:\n");
     for (size_t i = 0; i < points.size(); i++) {
         Writer::printString("Раунд ");
@@ -646,14 +734,17 @@ void printResults(std::deque<uint32_t> points,
     }
 }
 
-void set_timer_ms(uint32_t ms) {
-    htim6.Instance->ARR = ms - 1;
-    HAL_TIM_Base_Start_IT(&htim6);
+void set_timer_ms(uint32_t
+ms) {
+htim6.Instance->
+ARR = ms - 1;
+HAL_TIM_Base_Start_IT(&htim6);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     if (htim->Instance == TIM6) {
-        Reader::tick();
+        DRIVER.tick();
+        KEYPAD.tick();
         player.tick();
     }
 }
@@ -711,8 +802,8 @@ int main(void) {
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1) {
-        if (Reader::canRead()) {
-            char input = Reader::read();
+        if (READER.canRead()) {
+            char input = READER.read();
             switch (input) {
                 case 'a':
                     player.switchMode();
