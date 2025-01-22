@@ -478,6 +478,10 @@ public:
         }
     }
 
+    void reset() {
+        queue.clear();
+    }
+
 private:
     uint8_t mode;
     std::deque<Impulse> queue;
@@ -541,6 +545,7 @@ public:
     }
 
     void clear() {
+        player.reset();
         points.clear();
         roundResults.clear();
         musicImpulseSequence = MusicImpulseSequence();
