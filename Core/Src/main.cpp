@@ -630,7 +630,7 @@ void printResults(std::deque<uint32_t> points,
     Writer::printString("\nРезультаты игры:\n");
     for (size_t i = 0; i < points.size(); i++) {
         Writer::printString("Раунд ");
-        Writer::printChar(49 + i);
+        Writer::printNumber(i);
         Writer::printString(": ");
         Writer::printString(translateRoundResult(roundResults[i]));
         Writer::printString(", очков ");
