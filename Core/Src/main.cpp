@@ -34,8 +34,19 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define CLOCK_SCALED_FREQUENCY    1000000        // frequency after scaling with PSC (supposed to be same on every timer in use)
-#define LED_PWM_FREQUENCY        500
+#define CLOCK_SCALED_FREQUENCY	1000000		// frequency after scaling with PSC (supposed to be same on every timer in use)
+#define LED_PWM_FREQUENCY		500
+#define ENTER_ASCII				'\r'
+#define	INPUT_PORT_REG			(0x00)
+#define	OUTPUT_PORT_REG			(0x01)
+#define	POLARITY_INV_REG		(0x02)
+#define CONFIG_REG				(0x03)
+#define KEYPAD_ADDRESS			(0xE2)
+#define KEYPAD_WRITE_ADDRESS	((KEYPAD_ADDRESS) & ~1)
+#define KEYPAD_READ_ADDRESS		((KEYPAD_ADDRESS) | 1)
+#define COLUMN_MASK				0x7
+#define CONTACT_BOUNCE_MS		20
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
