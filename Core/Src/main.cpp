@@ -61,6 +61,8 @@ enum TimeoutResult {
     OK, EXPIRED
 };
 
+
+
 class Timer {
 public:
     void begin() {
@@ -287,15 +289,18 @@ private:
 
 class UartDriver {
 public:
+	bool ITMode = false;
+
     enum Mode {
         INT,
         BLOCK
     };
 
     void switchMode() {
+    	ITMode = !ITMode;
         switch (current) {
         case INT: current = BLOCK; break;
-        case BLOCK: current = INT; break;
+        case BLOCK: current = BLOCK; break;
         }
     }
 
@@ -437,6 +442,8 @@ public:
     }
 
 };
+
+char modeSwitchedMessage[] = "\nMode switched to ";
 
 class ToggleDriver {
 public:
@@ -587,6 +594,14 @@ int main(void) {
             case TOGGLE_IT_MODE:
                 session.recordActivity();
                 DRIVER.switchMode();
+				Printer::printString(modeSwitchedMessage, sizeof(modeSwitchedMessage)/sizeof(char));
+				if (DRIVER.ITMode) {
+					char mode[] = "INTERRUPT\n";
+					Printer::printString(mode, sizeof(mode)/sizeof(char));
+				} else {
+					char mode[] = "POLLING\n";
+					Printer::printString(mode, sizeof(mode)/sizeof(char));
+				}
                 break;
             case NOTHING:
                 if (session.isSessionTimeouted()) {
