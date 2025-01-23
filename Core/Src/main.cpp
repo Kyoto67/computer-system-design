@@ -201,7 +201,11 @@ private:
             } else {
                 uncheckedInput = translatedKey;
             }
-
+        } else {
+        	if (!isExistsUnread) {
+        		input = 0;
+        		uncheckedInput = 0;
+        	}
         }
     }
 
@@ -838,8 +842,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
         KEYPAD.tick();
         player.tick();
         if (TOGGLE.switched()) {
-            printModeSwitched();
             GAME_MODE = !GAME_MODE;
+            printModeSwitched();
         }
     }
 }
@@ -848,6 +852,7 @@ void init_led_pwm() {
     htim4.Instance->ARR = CLOCK_SCALED_FREQUENCY / LED_PWM_FREQUENCY;
 }
 
+MusicGame game = MusicGame();
 
 void doGame(char input) {
     switch (input) {
@@ -891,8 +896,6 @@ int main(void) {
     HAL_Init();
 
     /* USER CODE BEGIN Init */
-    MusicImpulseSequence musicImpulseSequence;
-    MusicGame game = MusicGame();
     /* USER CODE END Init */
 
     /* Configure the system clock */
