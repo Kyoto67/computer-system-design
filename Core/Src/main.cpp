@@ -34,19 +34,25 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define CLOCK_SCALED_FREQUENCY	1000000		// frequency after scaling with PSC (supposed to be same on every timer in use)
-#define LED_PWM_FREQUENCY		500
-#define ENTER_ASCII				'\r'
-#define	INPUT_PORT_REG			(0x00)
-#define	OUTPUT_PORT_REG			(0x01)
-#define	POLARITY_INV_REG		(0x02)
-#define CONFIG_REG				(0x03)
-#define KEYPAD_ADDRESS			(0xE2)
-#define KEYPAD_WRITE_ADDRESS	((KEYPAD_ADDRESS) & ~1)
-#define KEYPAD_READ_ADDRESS		((KEYPAD_ADDRESS) | 1)
-#define COLUMN_MASK				0x7
-#define CONTACT_BOUNCE_MS		20
+#define CLOCK_SCALED_FREQUENCY    1000000        // frequency after scaling with PSC (supposed to be same on every timer in use)
+#define LED_PWM_FREQUENCY        500
+#define ENTER_ASCII                '\r'
+#define    INPUT_PORT_REG            (0x00)
+#define    OUTPUT_PORT_REG            (0x01)
+#define    POLARITY_INV_REG        (0x02)
+#define CONFIG_REG                (0x03)
+#define KEYPAD_ADDRESS            (0xE2)
+#define KEYPAD_WRITE_ADDRESS    ((KEYPAD_ADDRESS) & ~1)
+#define KEYPAD_READ_ADDRESS        ((KEYPAD_ADDRESS) | 1)
+#define COLUMN_MASK                0x7
+#define CONTACT_BOUNCE_MS        20
 
+static uint8_t rows[] = {
+        0xFE,
+        0xFD,
+        0xFB,
+        0xF7
+};
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -75,80 +81,98 @@ void SystemClock_Config(void);
 class MatrixKeypadDriver {
 public:
     void tick() {
-        int read = keypad_read_key_index();
-        if (read != -1) {
-            isExistsUnread = true;
-            input = read;
+        if (readyForPoll) {
+            readyForPoll = false;
+            poll();
+            readyForPull = true;
         }
+        if (readyForPull) {
+            readyForPull = false;
+            pull();
+        }
+    }
+
+    void handlePullResult() {
+        if (buf & 0x10) {
+            key = key || (buf & 0x10);
+            key = key || (1 << currentRow);
+        }
+        if (buf & 0x20) {
+            key = key || (buf & 0x10);
+            key = key || (1 << currentRow);
+        }
+        if (buf & 0x40) {
+            key = key || (buf & 0x10);
+            key = key || (1 << currentRow);
+        }
+
+        roll();
     }
 
     bool canRead() {
         return isExistsUnread;
     }
 
-    int read() {
+    char read() {
         isExistsUnread = false;
         return input;
     }
 
 private:
-    bool isExistsUnread = false;
-    int input = -1;
-    uint32_t last_pressed_time = 0;
-    int last_pressed_key_index = -1;
+    uint8_t buf;
+    bool readyForPoll = true;
+    bool readyForPull = false;
+    uint8_t currentRow = 0;
+    uint8_t key = 0;
+    uint8_t input;
+    bool isExistsUnread;
+    std::unordered_map<uint8_t, char> keysTranslator = {
+            {0x11, '1'},
+            {0x21, '2'},
+            {0x41, '3'},
+            {0x12, '4'},
+            {0x22, '5'},
+            {0x42, '6'},
+            {0x14, '7'},
+            {0x24, '8'},
+            {0x44, '9'}
+    };
 
-    HAL_StatusTypeDef reset_keypad(void) {
-        uint8_t buf = 0;
-        HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, POLARITY_INV_REG, 1, &buf, 1, 100);
-        if (status != HAL_OK)
-            return status;
-        status = HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, OUTPUT_PORT_REG, 1, &buf, 1, 100);
-        return status;
-    }
-
-    int keypad_read_key_index(void) {
-        uint32_t cur_time = HAL_GetTick();
-        if (cur_time - last_pressed_time < CONTACT_BOUNCE_MS) return -1;
-
-        int key_index = -1;
-        uint8_t buf;
-        uint16_t pressed_column;
-
-        for (int row = 0; row < 4; row++) {
-            buf = ~((uint8_t)(1 << row));
-            pressed_column = 0x00;
-
-            reset_keypad();
-
-            HAL_I2C_Mem_Write(&hi2c1, KEYPAD_WRITE_ADDRESS, CONFIG_REG, 1, &buf, 1, 100);
-            HAL_Delay(10);
-            HAL_I2C_Mem_Read(&hi2c1, KEYPAD_READ_ADDRESS, INPUT_PORT_REG, 1, &buf, 1, 100);
-
-            pressed_column = (~(buf >> 4)) & COLUMN_MASK;
-            switch (pressed_column) {
-                case 0x1:
-                    if (key_index != -1) return -1;
-                    key_index = row * 3;
-                    break;
-                case 0x2:
-                    if (key_index != -1) return -1;
-                    key_index = (row * 3) + 1;
-                    break;
-                case 0x4:
-                    if (key_index != -1) return -1;
-                    key_index = (row * 3) + 2;
-                    break;
-            }
+    void roll() {
+        currentRow++;
+        readyForPoll = true;
+        if (currentRow == 4) {
+            push();
+            reset();
         }
-
-        if (key_index != -1) last_pressed_time = cur_time;
-        if (key_index == last_pressed_key_index)
-            return -1;
-        last_pressed_key_index = key_index;
-        return key_index;
     }
+
+    void reset() {
+        key = 0;
+        currentRow = 0;
+    }
+
+    void poll() {
+        HAL_I2C_Mem_Write_IT(&hi2c1, 0xE2, 0x03, 1, rows + currentRow, 1);
+    }
+
+    void pull() {
+        HAL_I2C_Mem_Read_IT(&hi2c1, 0xE2, 0x00, 1, &buf, 1);
+    }
+
+    void push(uint8_t key) {
+        auto it = keysTranslator.find(key);
+        if (it != keysTranslator.end()) {
+            input = it->second;
+            isExistsUnread = true;
+        }
+    }
+
 } KEYPAD;
 
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+    KEYPAD.handlePullResult()
+}
 
 class UartDriver {
 public:
@@ -219,7 +243,7 @@ public:
             return DRIVER.read();
         }
         if (KEYPAD.canRead()) {
-            return (char) KEYPAD.read() + 48;
+            return KEYPAD.read();
         }
         return 0;
     }
