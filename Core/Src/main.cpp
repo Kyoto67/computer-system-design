@@ -24,6 +24,8 @@
 #include <cstdint>
 #include <cctype>
 #include <utility>
+#include <deque>
+#include <string>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -53,6 +55,8 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+char tmp;
+
 enum LockResponse {
     CORRECT, WRONG, OPEN, BLOCKED
 };
@@ -60,7 +64,6 @@ enum LockResponse {
 enum TimeoutResult {
     OK, EXPIRED
 };
-
 
 
 class Timer {
@@ -247,126 +250,131 @@ class RingBuffer {
 public:
     static const int MAX_CAPACITY = 256;
 
-    char* tail() {
-        return &_buffer[_tail];
+    void push(char *c) {
+        buffer.push_back(*c);
     }
 
-    char* head() {
-        return &_buffer[_head];
-    }
-
-    bool isEmpty() const {
-        return _head == _tail;
-    }
-
-    bool isFull() const {
-        return _tail + 1 == _head;
-    }
-
-    bool push() {
-        if (isFull()) {
-            return false;
+    char pop() {
+        if (buffer.empty()) {
+            return 0;
+        } else {
+            char c = buffer.front();
+            buffer.pop_front();
+            return c;
         }
-        _tail++;
-        return true;
     }
 
-    bool pop() {
-        if (isEmpty()) {
-            return false;
+    void push(std::string str) {
+        for (s: str) {
+            push(s);
         }
-        _head++;
-        return true;
     }
 
+    bool isEmpty() {
+        return buffer.empty();
+    }
+
+    std::string flush() {
+        std::string str = result(buffer.begin(), buffer.end());
+        buffer.clear();
+        return str;
+    }
 
 private:
-
-
-    uint8_t _head = 0, _tail = 0;
-    char _buffer[MAX_CAPACITY];
+    std::deque<char> buffer;
 };
+
+RingBuffer input;
+RingBuffer output;
 
 class UartDriver {
 public:
-	bool ITMode = false;
-
     enum Mode {
         INT,
         BLOCK
     };
 
     void switchMode() {
-    	ITMode = !ITMode;
         switch (current) {
-        case INT: current = BLOCK; break;
-        case BLOCK: current = BLOCK; break;
+            case INT:
+                current = BLOCK;
+                break;
+            case BLOCK:
+                current = INT;
+                char dummy = 0;
+                HAL_UART_Transmit_IT(huart, &dummy, 0);
+                HAL_UART_Receive_IT(&huart6, (uint8_t * ) & tmp, 1);
+                break;
         }
     }
 
 
-    bool recv(char* c) {
+    bool recv(char *c) {
         switch (current) {
-        case INT: {
-            InterruptGuard guard{};
-            char* head = input.head();
-            if(!input.pop()) {
-                HAL_UART_Receive_IT(&huart6, (uint8_t *) input.tail(), 1);
-                return false;
+            case INT: {
+                if (input.isEmpty()) {
+                    return false;
+                } else {
+                    *c = input.pop();
+                    return true;
+                }
             }
-            *c = *head;
-            return true;
-        }break;
-        case BLOCK: return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 1);
-        default: return false;
+            case BLOCK:
+                return HAL_OK == HAL_UART_Receive(&huart6, (uint8_t *) c, 1, 1);
+            default:
+                return false;
         }
     }
 
     bool send(char c) {
         switch (current) {
-        case INT: {
-            InterruptGuard guard{};
-            if(output.push()) {
-                *output.tail() = c;
-                HAL_UART_Transmit_IT(&huart6, (uint8_t *) output.tail(), 1);
+            case INT: {
+                output.push(c);
                 return true;
             }
-            return false;
-        } break;
-        case BLOCK: return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t *) &c, 1, 10);
-        default: return false;
+            case BLOCK:
+                return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t * ) & c, 1, 10);
+            default:
+                return false;
         }
     }
 
-    RingBuffer input;
-    RingBuffer output;
     Mode current = BLOCK;
 } DRIVER;
 
 
 class Printer {
 public:
-	static void printChar(char c) {
-		while(!DRIVER.send(c));
-	}
+    static void printChar(char c) {
+        while (!DRIVER.send(c));
+    }
 
-	static void printString(char* arr, uint32_t size) {
-		for (uint32_t i=0; i<size; i++) {
-			printChar(arr[i]);
-		}
-	}
+    static void printString(char *arr, uint32_t size) {
+        for (uint32_t i = 0; i < size; i++) {
+            printChar(arr[i]);
+        }
+    }
 
 };
 
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef * huart) {
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     InterruptGuard guard{};
-    DRIVER.input.push();
-    HAL_UART_Receive_IT(&huart6, (uint8_t *) DRIVER.input.tail(), 1);
+    input.push(tmp);
+    if (DRIVER.current == UartDriver::INT) {
+        HAL_UART_Receive_IT(&huart6, (uint8_t * ) & tmp, 1);
+    }
 }
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef * huart) {
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     InterruptGuard guard{};
-    DRIVER.output.pop();
+    if (DRIVER.current == UartDriver::INT) {
+        std::string out = output.flush();
+        bool isSuccessful = false;
+        while (isSuccessful) {
+            const uint8_t *pData = reinterpret_cast<const uint8_t *>(out.c_str());
+            isSuccessful = HAL_OK == HAL_UART_Transmit_IT(huart, pData, str.size());
+        }
+    }
 }
 
 class Session {
@@ -403,7 +411,7 @@ public:
     bool askNewCode(char toFill[], uint8_t len, Session currentSession) {
         char inputInvite[] = "\nPlease, input the new passcode: ";
         char tmp[len];
-        Printer::printString(inputInvite, sizeof(inputInvite)/sizeof(char));
+        Printer::printString(inputInvite, sizeof(inputInvite) / sizeof(char));
         for (int i = 0; i < len; ++i) {
             char c;
             while (!DRIVER.recv(&c)) {
@@ -423,10 +431,10 @@ public:
             }
         }
         char repeatNewPasscodeMessage[] = "\nThe new passcode will be: ";
-        Printer::printString(repeatNewPasscodeMessage, sizeof(repeatNewPasscodeMessage)/sizeof(char));
-        Printer::printString(tmp, sizeof(tmp)/sizeof(char));
+        Printer::printString(repeatNewPasscodeMessage, sizeof(repeatNewPasscodeMessage) / sizeof(char));
+        Printer::printString(tmp, sizeof(tmp) / sizeof(char));
         char confirmingMessage[] = "\nConfirm? (y/n): ";
-        Printer::printString(confirmingMessage, sizeof(confirmingMessage)/sizeof(char));
+        Printer::printString(confirmingMessage, sizeof(confirmingMessage) / sizeof(char));
         char c;
         while (!DRIVER.recv(&c));
         Printer::printChar(c);
@@ -594,14 +602,14 @@ int main(void) {
             case TOGGLE_IT_MODE:
                 session.recordActivity();
                 DRIVER.switchMode();
-				Printer::printString(modeSwitchedMessage, sizeof(modeSwitchedMessage)/sizeof(char));
-				if (DRIVER.ITMode) {
-					char mode[] = "INTERRUPT\n";
-					Printer::printString(mode, sizeof(mode)/sizeof(char));
-				} else {
-					char mode[] = "POLLING\n";
-					Printer::printString(mode, sizeof(mode)/sizeof(char));
-				}
+                Printer::printString(modeSwitchedMessage, sizeof(modeSwitchedMessage) / sizeof(char));
+                if (DRIVER.ITMode) {
+                    char mode[] = "INTERRUPT\n";
+                    Printer::printString(mode, sizeof(mode) / sizeof(char));
+                } else {
+                    char mode[] = "POLLING\n";
+                    Printer::printString(mode, sizeof(mode) / sizeof(char));
+                }
                 break;
             case NOTHING:
                 if (session.isSessionTimeouted()) {
