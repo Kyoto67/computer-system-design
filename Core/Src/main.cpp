@@ -302,7 +302,7 @@ public:
             case BLOCK:
                 current = INT;
                 char dummy = 0;
-                HAL_UART_Transmit_IT(&huart6, &dummy, 0);
+                HAL_UART_Transmit_IT(&huart6, (uint8_t * ) & dummy, 0);
                 HAL_UART_Receive_IT(&huart6, (uint8_t * ) & tmp, 1);
                 break;
         }
@@ -371,8 +371,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
         std::string out = output.flush();
         bool isSuccessful = false;
         while (!isSuccessful) {
-            const uint8_t *pData = reinterpret_cast<const uint8_t *>(out.c_str());
-            isSuccessful = HAL_OK == HAL_UART_Transmit_IT(&huart6, pData, out.size());
+            isSuccessful = HAL_OK == HAL_UART_Transmit_IT(&huart6, (uint8_t *) out.c_str(), out.size());
         }
     }
 }
