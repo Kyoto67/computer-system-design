@@ -250,7 +250,7 @@ class RingBuffer {
 public:
     static const int MAX_CAPACITY = 256;
 
-    void push(char *c) {
+    void push(char c) {
         buffer.push_back(*c);
     }
 
@@ -275,7 +275,7 @@ public:
     }
 
     std::string flush() {
-        std::string str = result(buffer.begin(), buffer.end());
+        std::string str = buffer(buffer.begin(), buffer.end());
         buffer.clear();
         return str;
     }
