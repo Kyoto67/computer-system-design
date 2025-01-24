@@ -312,7 +312,7 @@ public:
     bool recv(char *c) {
         switch (current) {
             case INT: {
-            	InterruptGuard guard{};
+                InterruptGuard guard{};
                 if (input.isEmpty()) {
                     return false;
                 } else {
@@ -330,14 +330,25 @@ public:
     bool send(char c) {
         switch (current) {
             case INT: {
-            	InterruptGuard guard{};
+                InterruptGuard guard{};
                 output.push(c);
+                ensureForDataIsSent();
                 return true;
             }
             case BLOCK:
                 return HAL_OK == HAL_UART_Transmit(&huart6, (uint8_t * ) & c, 1, 10);
             default:
                 return false;
+        }
+    }
+
+    void ensureForDataIsSent() {
+        if (current == UartDriver::INT && !output.isEmpty()) {
+            std::string out = output.flush();
+            bool isSuccessful = false;
+            while (!isSuccessful) {
+                isSuccessful = HAL_OK == HAL_UART_Transmit_IT(&huart6, (uint8_t *) out.c_str(), out.size());;
+            }
         }
     }
 
@@ -369,17 +380,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     InterruptGuard guard{};
-    if (DRIVER.current == UartDriver::INT && !output.isEmpty()) {
-        std::string out = output.flush();
-        bool isSuccessful = false;
-        while (!isSuccessful) {
-        	auto res = HAL_UART_Transmit_IT(&huart6, (uint8_t *) out.c_str(), out.size());
-            isSuccessful = HAL_OK == res;
-        }
-    } else {
-    	char dummy = 0;
-		HAL_UART_Transmit_IT(&huart6, (uint8_t * ) & dummy, 1);
-    }
+    DRIVER.ensureForDataIsSent();
 }
 
 class Session {
