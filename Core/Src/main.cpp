@@ -248,7 +248,6 @@ private:
 
 class RingBuffer {
 public:
-    static const int MAX_CAPACITY = 256;
 
     void push(char c) {
         buffer.push_back(c);
@@ -301,8 +300,9 @@ public:
                 break;
             case BLOCK:
                 current = INT;
+                InterruptGuard guard{};
                 char dummy = 0;
-                HAL_UART_Transmit_IT(&huart6, (uint8_t * ) & dummy, 0);
+                HAL_UART_Transmit_IT(&huart6, (uint8_t * ) & dummy, 1);
                 HAL_UART_Receive_IT(&huart6, (uint8_t * ) & tmp, 1);
                 break;
         }
@@ -312,6 +312,7 @@ public:
     bool recv(char *c) {
         switch (current) {
             case INT: {
+            	InterruptGuard guard{};
                 if (input.isEmpty()) {
                     return false;
                 } else {
@@ -329,6 +330,7 @@ public:
     bool send(char c) {
         switch (current) {
             case INT: {
+            	InterruptGuard guard{};
                 output.push(c);
                 return true;
             }
@@ -367,12 +369,16 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     InterruptGuard guard{};
-    if (DRIVER.current == UartDriver::INT) {
+    if (DRIVER.current == UartDriver::INT && !output.isEmpty()) {
         std::string out = output.flush();
         bool isSuccessful = false;
         while (!isSuccessful) {
-            isSuccessful = HAL_OK == HAL_UART_Transmit_IT(&huart6, (uint8_t *) out.c_str(), out.size());
+        	auto res = HAL_UART_Transmit_IT(&huart6, (uint8_t *) out.c_str(), out.size());
+            isSuccessful = HAL_OK == res;
         }
+    } else {
+    	char dummy = 0;
+		HAL_UART_Transmit_IT(&huart6, (uint8_t * ) & dummy, 1);
     }
 }
 
