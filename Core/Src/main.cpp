@@ -251,7 +251,7 @@ public:
     static const int MAX_CAPACITY = 256;
 
     void push(char c) {
-        buffer.push_back(*c);
+        buffer.push_back(c);
     }
 
     char pop() {
@@ -265,7 +265,7 @@ public:
     }
 
     void push(std::string str) {
-        for (s: str) {
+        for (char s: str) {
             push(s);
         }
     }
@@ -275,7 +275,7 @@ public:
     }
 
     std::string flush() {
-        std::string str = buffer(buffer.begin(), buffer.end());
+        std::string str(buffer.begin(), buffer.end());
         buffer.clear();
         return str;
     }
@@ -302,7 +302,7 @@ public:
             case BLOCK:
                 current = INT;
                 char dummy = 0;
-                HAL_UART_Transmit_IT(huart, &dummy, 0);
+                HAL_UART_Transmit_IT(&huart6, &dummy, 0);
                 HAL_UART_Receive_IT(&huart6, (uint8_t * ) & tmp, 1);
                 break;
         }
@@ -370,9 +370,9 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
     if (DRIVER.current == UartDriver::INT) {
         std::string out = output.flush();
         bool isSuccessful = false;
-        while (isSuccessful) {
+        while (!isSuccessful) {
             const uint8_t *pData = reinterpret_cast<const uint8_t *>(out.c_str());
-            isSuccessful = HAL_OK == HAL_UART_Transmit_IT(huart, pData, str.size());
+            isSuccessful = HAL_OK == HAL_UART_Transmit_IT(&huart6, pData, out.size());
         }
     }
 }
@@ -603,7 +603,7 @@ int main(void) {
                 session.recordActivity();
                 DRIVER.switchMode();
                 Printer::printString(modeSwitchedMessage, sizeof(modeSwitchedMessage) / sizeof(char));
-                if (DRIVER.ITMode) {
+                if (DRIVER.current == UartDriver::INT) {
                     char mode[] = "INTERRUPT\n";
                     Printer::printString(mode, sizeof(mode) / sizeof(char));
                 } else {
